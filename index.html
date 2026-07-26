@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1117">
+<title>TCI Fleet Manager</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#0f1117; --card:#1a1d27; --border:#2a2d3a;
+    --accent:#4f8ef7; --accent2:#7c3aed; --green:#22c55e;
+    --yellow:#eab308; --red:#ef4444; --text:#e2e8f0; --muted:#94a3b8;
+    --header-h:56px;
+  }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  header { position:fixed; top:0; left:0; right:0; height:var(--header-h); background:var(--card);
+    border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; z-index:100; gap:12px; }
+  header h1 { font-size:1rem; font-weight:700; flex:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .status-bar { font-size:0.68rem; color:var(--muted); text-align:right; line-height:1.3; }
+  .status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:4px; }
+  .status-dot.offline { background:var(--yellow); }
+  .main { padding: calc(var(--header-h) + 12px) 12px 40px; max-width:900px; margin:0 auto; }
+
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px; }
+  .acc-title { font-weight:700; margin-bottom:8px; color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+  th,td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; font-size:0.72rem; text-transform:uppercase; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.68rem; font-weight:600; }
+  .badge.ok { background:rgba(34,197,94,0.15); color:var(--green); }
+  .badge.warn { background:rgba(234,179,8,0.15); color:var(--yellow); }
+  .badge.exp { background:rgba(239,68,68,0.15); color:var(--red); }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; }
+  .tab { flex:0 0 auto; background:var(--card); border:1px solid var(--border); border-radius:8px;
+    padding:8px 14px; font-size:0.8rem; cursor:pointer; }
+  .tab.active { border-color:var(--accent); color:var(--accent); }
+  .section { display:none; }
+  .section.active { display:block; }
+  .login-box { max-width:340px; margin: 30vh auto 0; padding:24px; }
+  .login-box input { width:100%; padding:10px 12px; margin-bottom:10px; background:#11141c;
+    border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:0.9rem; }
+  .login-box button { width:100%; padding:10px; border:none; border-radius:8px; font-weight:600;
+    background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; cursor:pointer; }
+  .msg { font-size:0.75rem; color:var(--muted); margin-top:8px; text-align:center; }
+  .empty { color:var(--muted); font-size:0.85rem; text-align:center; padding:30px 10px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>TCI Fleet Manager</h1>
+  <div class="status-bar" id="statusBar"><span class="status-dot" id="statusDot"></span><span id="statusText">Loading...</span></div>
+</header>
+
+<div class="main">
+  <!-- Login (one-time) -->
+  <div id="loginBox" class="login-box card" style="display:none;">
+    <div class="acc-title" style="margin-bottom:14px;">Sign in</div>
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPass" placeholder="Password">
+    <button onclick="doLogin()">Login</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <!-- Data view -->
+  <div id="dataView" style="display:none;">
+    <div class="tabs">
+      <div class="tab active" data-tab="trips" onclick="switchTab('trips')">Trip Details</div>
+      <div class="tab" data-tab="vehicles" onclick="switchTab('vehicles')">Vehicle Info</div>
+    </div>
+
+    <div id="section-trips" class="section active"></div>
+    <div id="section-vehicles" class="section"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const CACHE_KEY = 'tci_cached_data';
+let cachedData = null;
+
+function setStatus(text, online){
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusDot').className = 'status-dot' + (online ? '' : ' offline');
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active', s.id==='section-'+name));
+}
+
+async function firebaseLogin(email, password){
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password, returnSecureToken:true})
+  });
+  if(!res.ok) throw new Error((await res.json()).error?.message || 'Login failed');
+  return res.json();
+}
+
+async function fetchData(idToken){
+  const res = await fetch(`${FIREBASE_DB_URL}/tci_data.json?auth=${idToken}`);
+  if(!res.ok) throw new Error('Fetch failed');
+  return res.json();
+}
+
+function render(data){
+  if(!data){ document.getElementById('section-trips').innerHTML = '<div class="empty">Abhi tak koi data nahi hai. Laptop pe script chalao.</div>'; return; }
+  document.getElementById('statusText').innerHTML = 'Last updated: ' + (data.last_updated || '—');
+
+  // trips
+  let html = '';
+  const trips = data.trip_details || {};
+  const names = data.account_names || {};
+  const keys = Object.keys(trips);
+  if(keys.length === 0) html = '<div class="empty">Trip data nahi mila.</div>';
+  for(const key of keys){
+    const rows = trips[key] || [];
+    html += `<div class="card"><div class="acc-title">${names[key] || key}</div>`;
+    if(rows.length === 0){
+      html += '<div class="empty">Is account ke liye trip data nahi hai.</div>';
+    } else {
+      html += '<table><thead><tr>' + Object.keys(rows[0]).map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+      for(const row of rows){
+        html += '<tr>' + Object.values(row).map(v=>`<td>${v ?? ''}</td>`).join('') + '</tr>';
+      }
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+  }
+  document.getElementById('section-trips').innerHTML = html;
+
+  // vehicles
+  const vehicles = data.vehicle_info || [];
+  let vhtml = '';
+  if(vehicles.length === 0){
+    vhtml = '<div class="empty">Vehicle info nahi hai.</div>';
+  } else {
+    vhtml = '<div class="card"><table><thead><tr>' + Object.keys(vehicles[0]).map(h=>`<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+    for(const v of vehicles){
+      vhtml += '<tr>' + Object.values(v).map(x=>`<td>${x ?? ''}</td>`).join('') + '</tr>';
+    }
+    vhtml += '</tbody></table></div>';
+  }
+  document.getElementById('section-vehicles').innerHTML = vhtml;
+}
+
+async function loadData(){
+  const idToken = localStorage.getItem('tci_id_token');
+  if(!idToken){ showLogin(); return; }
+  try{
+    const data = await fetchData(idToken);
+    if(data){
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      setStatus('Last updated: ' + (data.last_updated || '—'), true);
+      render(data);
+    } else {
+      render(null);
+    }
+  } catch(e){
+    // offline / laptop off / no internet -> show last cached data
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      const data = JSON.parse(cached);
+      setStatus('Offline — showing last saved data (' + (data.last_updated || '—') + ')', false);
+      render(data);
+    } else {
+      setStatus('Offline — no cached data yet', false);
+      render(null);
+    }
+  }
+}
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const msg = document.getElementById('loginMsg');
+  msg.textContent = 'Signing in...';
+  try{
+    const res = await firebaseLogin(email, pass);
+    localStorage.setItem('tci_id_token', res.idToken);
+    localStorage.setItem('tci_refresh_token', res.refreshToken);
+    document.getElementById('loginBox').style.display = 'none';
+    document.getElementById('dataView').style.display = 'block';
+    loadData();
+  } catch(e){
+    msg.textContent = e.message;
+  }
+}
+
+function showLogin(){
+  document.getElementById('loginBox').style.display = 'block';
+  document.getElementById('dataView').style.display = 'none';
+  setStatus('Please sign in', false);
+}
+
+// init
+(function(){
+  const idToken = localStorage.getItem('tci_id_token');
+  if(idToken){
+    document.getElementById('dataView').style.display = 'block';
+    loadData();
+  } else {
+    showLogin();
+  }
+})();
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
