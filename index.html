@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCI Fleet Manager</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #4f8ef7;
+    --accent2: #7c3aed;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --header-h: 60px;
+  }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    position: fixed; top: 0; left: 0; right: 0;
+    height: var(--header-h);
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 20px;
+    z-index: 100;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 1.1rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    flex: 1;
+  }
+  .status-bar {
+    font-size: 0.72rem; color: var(--muted);
+    text-align: right; line-height: 1.4;
+  }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: var(--green);
+    margin-right: 4px;
+  }
+  .status-dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Main layout ── */
+  .main { padding-top: calc(var(--header-h) + 16px); }
+
+  /* ── Home Page ── */
+  #page-home {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: calc(100vh - var(--header-h));
+    gap: 20px; padding: 24px;
+  }
+  .home-title {
+    font-size: 1.4rem; font-weight: 700;
+    color: var(--muted); letter-spacing: 0.05em;
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .home-btns {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    justify-content: center;
+  }
+  .home-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 40px;
+    cursor: pointer; text-align: center;
+    transition: all 0.2s;
+    min-width: 180px;
+  }
+  .home-btn:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79,142,247,0.15);
+  }
+  .home-btn .icon { font-size: 2.4rem; margin-bottom: 10px; }
+  .home-btn .label { font-size: 1rem; font-weight: 600; color: var(--text); }
+  .home-btn .sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  .refresh-btn {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 10px;
+    padding: 10px 22px; color: white;
+    font-weight: 600; cursor: pointer;
+    font-size: 0.85rem; transition: opacity 0.2s;
+  }
+  .refresh-btn:hover { opacity: 0.85; }
+  .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Section pages ── */
+  .page { display: none; padding: 16px 24px 80px; width: 96%; max-width: 1800px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  .page-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .back-btn {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 14px;
+    color: var(--text); cursor: pointer; font-size: 0.85rem;
+  }
+  .back-btn:hover { border-color: var(--accent); }
+  .page-title { font-size: 1.2rem; font-weight: 700; flex: 1; }
+
+  /* ── Account tabs ── */
+  .acc-tabs {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .acc-tab {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 16px;
+    cursor: pointer; font-size: 0.85rem; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .acc-tab:hover { border-color: var(--accent); }
+  .acc-tab.active {
+    background: var(--accent); border-color: var(--accent);
+    color: white;
+  }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th {
+    background: #1e2133; padding: 10px 12px;
+    text-align: left; font-size: 0.72rem;
+    letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--muted); white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .trip-badge {
+    display: inline-block;
+    background: rgba(79,142,247,0.15);
+    color: var(--accent);
+    border-radius: 20px; padding: 2px 10px;
+    font-weight: 700; font-size: 0.8rem;
+  }
+  .total-row td {
+    background: rgba(79,142,247,0.08);
+    font-weight: 700; border-top: 1px solid var(--border);
+  }
+
+  /* ── Vehicle-wise sections ── */
+  .grand-summary {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;
+    font-size: 0.85rem; color: var(--muted);
+  }
+  .grand-summary b { color: var(--text); font-size: 0.95rem; }
+
+  /* ── Vehicle tabs (click-to-select, jaise account tabs) ── */
+  .veh-tabs {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .veh-tab {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+    cursor: pointer; font-size: 0.82rem; font-weight: 600;
+    transition: all 0.15s; color: var(--text);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .veh-tab:hover { border-color: var(--accent); }
+  .veh-tab.active {
+    background: var(--accent); border-color: var(--accent);
+    color: white;
+  }
+  .veh-tab-count {
+    background: rgba(255,255,255,0.15);
+    border-radius: 20px; padding: 1px 8px;
+    font-size: 0.72rem; font-weight: 700;
+  }
+  .veh-tab.active .veh-tab-count {
+    background: rgba(255,255,255,0.25);
+  }
+
+  .vehicle-section {
+    margin-bottom: 20px; border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; background: var(--card);
+  }
+  .vehicle-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; background: #1e2133;
+    border-bottom: 1px solid var(--border);
+  }
+  .vehicle-name { font-weight: 700; font-size: 0.95rem; }
+  .vehicle-trip-count {
+    background: rgba(79,142,247,0.15); color: var(--accent);
+    border-radius: 20px; padding: 3px 12px;
+    font-weight: 700; font-size: 0.78rem;
+  }
+  .table-scroll { overflow-x: auto; }
+  .trip-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+  .trip-table th {
+    background: #171a29; padding: 8px 8px;
+    text-align: left; font-size: 0.64rem;
+    letter-spacing: 0.02em; text-transform: uppercase;
+    color: var(--muted); white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .trip-table td {
+    padding: 8px 8px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .trip-table tr:last-child td { border-bottom: none; }
+  .trip-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── Vehicle info expiry ── */
+  .exp-green { color: var(--green); font-weight: 600; }
+  .exp-yellow { color: var(--yellow); font-weight: 600; }
+  .exp-red { color: var(--red); font-weight: 600; }
+
+  /* ── Vehicle info form ── */
+  .vi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px; margin-bottom: 16px;
+  }
+  .vi-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px;
+  }
+  .vi-card h4 {
+    font-size: 0.85rem; font-weight: 700; margin-bottom: 10px;
+    color: var(--accent);
+  }
+  .vi-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .vi-label { font-size: 0.72rem; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .vi-input {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 8px;
+    color: var(--text); font-size: 0.78rem;
+    flex: 1; width: 100%;
+  }
+  .vi-input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── PDF / action buttons ── */
+  .actions {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .btn-pdf {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 16px;
+    color: var(--text); cursor: pointer; font-size: 0.82rem;
+    display: flex; align-items: center; gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-pdf:hover { border-color: var(--accent); color: var(--accent); }
+
+  .save-btn {
+    background: var(--green); border: none;
+    border-radius: 8px; padding: 8px 20px;
+    color: white; font-weight: 700;
+    cursor: pointer; font-size: 0.82rem;
+  }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty p { font-size: 0.9rem; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px;
+    font-size: 0.85rem; z-index: 999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .home-btn { min-width: 140px; padding: 20px 24px; }
+    .page { padding: 12px 12px 80px; }
+    th, td { padding: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>🚛 TCI Fleet Manager</h1>
+  <div class="status-bar">
+    <span id="status-dot" class="status-dot"></span>
+    <span id="last-updated">Loading...</span>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- HOME PAGE -->
+  <div id="page-home">
+    <div class="home-title">Fleet Dashboard</div>
+    <div class="home-btns">
+      <div class="home-btn" onclick="showPage('trips')">
+        <div class="icon">📊</div>
+        <div class="label">Trip Details</div>
+        <div class="sub">Route wise trip count</div>
+      </div>
+      <div class="home-btn" onclick="showPage('vehicles')">
+        <div class="icon">🚗</div>
+        <div class="label">Vehicle Information</div>
+        <div class="sub">Insurance, PUC, Permit, Fitness</div>
+      </div>
+    </div>
+    <button class="refresh-btn" id="refresh-btn" onclick="refreshData()">
+      🔄 Data Update Karo
+    </button>
+    <div id="refresh-status" style="font-size:0.75rem;color:var(--muted);margin-top:8px;"></div>
+
+    <!-- Custom period option — default hamesha "Last month" hi hai -->
+    <div style="margin-top:16px; background:var(--card); border:1px solid var(--border);
+                border-radius:12px; padding:14px 18px; max-width:420px;">
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.82rem; cursor:pointer; margin-bottom:10px;">
+        <input type="checkbox" id="custom-period-toggle" onchange="toggleCustomPeriod()">
+        Custom period use karo (default: pichla mahina)
+      </label>
+      <div id="custom-period-fields" style="display:none; gap:10px; flex-wrap:wrap;">
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.72rem; color:var(--muted); display:block; margin-bottom:4px;">From date</label>
+          <input type="date" id="custom-from" style="background:var(--bg); border:1px solid var(--border);
+                 border-radius:6px; padding:6px 8px; color:var(--text); font-size:0.8rem;">
+        </div>
+        <div>
+          <label style="font-size:0.72rem; color:var(--muted); display:block; margin-bottom:4px;">To date</label>
+          <input type="date" id="custom-to" style="background:var(--bg); border:1px solid var(--border);
+                 border-radius:6px; padding:6px 8px; color:var(--text); font-size:0.8rem;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRIP DETAILS PAGE -->
+  <div id="page-trips" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('home')">← Back</button>
+      <div class="page-title">📊 Trip Details</div>
+      <button class="btn-pdf" onclick="downloadPDF()">⬇ PDF Download</button>
+    </div>
+
+    <!-- Account Tabs -->
+    <div class="acc-tabs" id="acc-tabs"></div>
+
+    <!-- Month info -->
+    <div style="font-size:0.75rem;color:var(--muted);margin-bottom:12px;" id="date-range-info"></div>
+
+    <!-- Trip Table -->
+    <div class="table-wrap" id="trip-table-wrap">
+      <div class="empty"><div class="icon">📭</div><p>Data load ho raha hai...</p></div>
+    </div>
+  </div>
+
+  <!-- VEHICLE INFORMATION PAGE -->
+  <div id="page-vehicles" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('home')">← Back</button>
+      <div class="page-title">🚗 Vehicle Information</div>
+    </div>
+    <div class="actions">
+      <button class="save-btn" onclick="saveVehicleInfo()">💾 Save</button>
+      <button class="btn-pdf" onclick="downloadVehiclePDF()">⬇ PDF Download</button>
+    </div>
+    <div id="vehicle-info-wrap"></div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let appData = null;
+let currentAcc = 'MA';
+const ACC_NAMES = {
+  TC: 'Tushar', SA: 'Suresh', SB: 'Subhita', MA: 'Manish', BJ: 'Bhojraj'
+};
+const ACC_KEYS = ['MA', 'SA', 'SB', 'TC', 'BJ'];
+
+// ── Init ───────────────────────────────────────────────
+async function init() {
+  await loadData();
+  renderVehicleInfoForm();
+  setInterval(checkStatus, 5000);
+}
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    appData = await res.json();
+    updateStatusBar();
+    if (document.getElementById('page-trips').classList.contains('active')) {
+      renderTripTable(currentAcc);
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── Pages ──────────────────────────────────────────────
+function showPage(page) {
+  document.getElementById('page-home').style.display = 'none';
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+  if (page === 'home') {
+    document.getElementById('page-home').style.display = 'flex';
+  } else if (page === 'trips') {
+    document.getElementById('page-trips').classList.add('active');
+    renderAccTabs();
+    renderTripTable(currentAcc);
+    updateDateRangeInfo();
+  } else if (page === 'vehicles') {
+    document.getElementById('page-vehicles').classList.add('active');
+    renderVehicleTable();
+  }
+}
+
+// ── Date range ─────────────────────────────────────────
+function getCurrentDateRange() {
+  // Pichle mahine ki dates
+  const now = new Date();
+  const firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastPrev  = new Date(firstThisMonth - 1);
+  const firstPrev = new Date(lastPrev.getFullYear(), lastPrev.getMonth(), 1);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmt = d => `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+  return { from: fmt(firstPrev), to: fmt(lastPrev) };
+}
+
+function updateDateRangeInfo() {
+  const {from, to} = getCurrentDateRange();
+  document.getElementById('date-range-info').textContent =
+    `📅 Period: ${from} to ${to}`;
+}
+
+// ── Account Tabs ───────────────────────────────────────
+function renderAccTabs() {
+  const wrap = document.getElementById('acc-tabs');
+  wrap.innerHTML = ACC_KEYS.map(k =>
+    `<div class="acc-tab ${k===currentAcc?'active':''}" onclick="switchAcc('${k}')">${ACC_NAMES[k]}</div>`
+  ).join('');
+}
+
+function switchAcc(acc) {
+  currentAcc = acc;
+  renderAccTabs();
+  renderTripTable(acc);
+}
+
+// ── Trip Table — Vehicle-wise sections, har trip alag row ──
+// State — kaunsa vehicle currently selected hai, har account ke liye alag
+let selectedVehicle = {};
+
+function renderTripTable(acc) {
+  const wrap = document.getElementById('trip-table-wrap');
+  const trips = appData?.trip_details?.[acc] || [];
+
+  if (!trips.length) {
+    wrap.innerHTML = `<div class="empty">
+      <div class="icon">📭</div>
+      <p>${ACC_NAMES[acc]} ke liye koi data nahi hai.<br>
+      "Data Update Karo" button dabao.</p>
+    </div>`;
+    return;
+  }
+
+  const fmt = n => (n || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // Vehicle ke hisaab se group karo — har vehicle ka apna section,
+  // andar har trip apni alag row (no aggregation)
+  const byVehicle = {};
+  trips.forEach(t => {
+    const v = t.vehicle || 'Unknown';
+    if (!byVehicle[v]) byVehicle[v] = [];
+    byVehicle[v].push(t);
+  });
+
+  const vehicleNames = Object.keys(byVehicle).sort();
+
+  // Grand totals (sab vehicles milakar)
+  const grand = {
+    trips: trips.length,
+    netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
+    penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
+  };
+
+  // Agar is account ke liye pehle se koi vehicle selected nahi hai,
+  // ya jo selected tha wo ab list mein nahi hai — pehla vehicle default lo
+  if (!selectedVehicle[acc] || !vehicleNames.includes(selectedVehicle[acc])) {
+    selectedVehicle[acc] = vehicleNames[0];
+  }
+  const activeVehicle = selectedVehicle[acc];
+
+  // ── Vehicle tabs (jaise account tabs — Tushar/Suresh/etc.) ──
+  const tabsHtml = vehicleNames.map(v => {
+    const count = byVehicle[v].length;
+    const isActive = v === activeVehicle;
+    return `<button class="veh-tab ${isActive ? 'active' : ''}"
+              onclick="selectVehicle('${acc}','${v}')">
+              🚛 ${v} <span class="veh-tab-count">${count}</span>
+            </button>`;
+  }).join('');
+
+  let html = `
+  <div class="grand-summary">
+    <span><b>${vehicleNames.length}</b> vehicles</span>
+    <span><b>${grand.trips}</b> total trips</span>
+    <span>Net Liability: <b>₹${fmt(grand.netLiability)}</b></span>
+    <span>Penalty Ded. (all vehicles): <b>₹${fmt(grand.penalty)}</b></span>
+  </div>
+  <div class="veh-tabs">${tabsHtml}</div>
+  <div id="veh-table-area"></div>`;
+
+  wrap.innerHTML = html;
+  renderVehicleTripTable(acc, activeVehicle, byVehicle);
+}
+
+function selectVehicle(acc, vehicle) {
+  selectedVehicle[acc] = vehicle;
+  // Sirf tabs ke active-state aur table area refresh karo,
+  // pura page nahi (fast, no flicker)
+  document.querySelectorAll('.veh-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim().startsWith('🚛 ' + vehicle));
+  });
+  const trips = appData?.trip_details?.[acc] || [];
+  const byVehicle = {};
+  trips.forEach(t => {
+    const v = t.vehicle || 'Unknown';
+    if (!byVehicle[v]) byVehicle[v] = [];
+    byVehicle[v].push(t);
+  });
+  renderVehicleTripTable(acc, vehicle, byVehicle);
+}
+
+// NOTE: pehle iska naam bhi "renderVehicleTable" tha — neeche vehicle-info
+// page ka ek aur function bhi isi naam se tha. JavaScript mein same-name
+// function dobara declare karne se PEHLA wala completely overwrite ho jaata
+// hai — matlab yeh trip-table wala function kabhi chalta hi nahi tha, aur
+// har vehicle tab click karne pe niche wala (vehicle-info) function chal
+// jaata tha jo bilkul alag cheez karta hai. Isi wajah se vehicle tabs pe
+// click karne se sahi trip data show nahi ho raha tha. Naam alag kar diya
+// hai taaki dono function apna-apna kaam sahi se karein.
+function renderVehicleTripTable(acc, vehicle, byVehicle) {
+  const area = document.getElementById('veh-table-area');
+  if (!area || !byVehicle[vehicle]) return;
+
+  const fmt = n => (n || 0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  const vTrips = [...byVehicle[vehicle]].sort((a,b) =>
+    (a.tcs_date || '').localeCompare(b.tcs_date || ''));
+
+  const vTotal = {
+    liability: vTrips.reduce((s,t)=>s+(t.liability||0),0),
+    gst: vTrips.reduce((s,t)=>s+(t.gst_amt||0),0),
+    netLiability: vTrips.reduce((s,t)=>s+(t.net_liability||0),0),
+    penalty: vTrips.reduce((s,t)=>s+(t.penalty||0),0),
+    handling: vTrips.reduce((s,t)=>s+(t.handling||0),0),
+    early: vTrips.reduce((s,t)=>s+(t.early_ded||0),0),
+    gps: vTrips.reduce((s,t)=>s+(t.gps_ded||0),0),
+    tds: vTrips.reduce((s,t)=>s+(t.tds_ded||0),0),
+  };
+
+  area.innerHTML = `
+  <div class="vehicle-section">
+    <div class="vehicle-header">
+      <span class="vehicle-name">🚛 ${vehicle}</span>
+      <span class="vehicle-trip-count">${vTrips.length} trips</span>
+    </div>
+    <div class="table-scroll">
+    <table class="trip-table">
+      <thead>
+        <tr>
+          <th>Sr No.</th>
+          <th>TCS No.</th>
+          <th>TCS Branch</th>
+          <th>TCS Date</th>
+          <th>TCS Dest</th>
+          <th>Close Date</th>
+          <th class="num">Liability Amt</th>
+          <th class="num">GST Amt</th>
+          <th class="num">Net Liability</th>
+          <th class="num">Penalty Ded.</th>
+          <th class="num">Handling Amt</th>
+          <th class="num">Early Payment Ded.</th>
+          <th class="num">GPS Amt Ded.</th>
+          <th class="num">TDS Ded.</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${vTrips.map((t, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${t.tcs_no || '-'}</td>
+          <td>${t.tcs_branch || '-'}</td>
+          <td>${t.tcs_date || '-'}</td>
+          <td>${t.tcs_dest || '-'}</td>
+          <td>${t.close_date || '-'}</td>
+          <td class="num">₹${fmt(t.liability)}</td>
+          <td class="num">₹${fmt(t.gst_amt)}</td>
+          <td class="num">₹${fmt(t.net_liability)}</td>
+          <td class="num">${t.penalty ? '₹'+fmt(t.penalty) : '-'}</td>
+          <td class="num">${t.handling ? '₹'+fmt(t.handling) : '-'}</td>
+          <td class="num">${t.early_ded ? '₹'+fmt(t.early_ded) : '-'}</td>
+          <td class="num">${t.gps_ded ? '₹'+fmt(t.gps_ded) : '-'}</td>
+          <td class="num">${t.tds_ded ? '₹'+fmt(t.tds_ded) : '-'}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="6"><b>${vehicle} TOTAL</b></td>
+          <td class="num"><b>₹${fmt(vTotal.liability)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.gst)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.netLiability)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.penalty)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.handling)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.early)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.gps)}</b></td>
+          <td class="num"><b>₹${fmt(vTotal.tds)}</b></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+  </div>`;
+}
+
+// ── Vehicle Info ───────────────────────────────────────
+const DOC_FIELDS = [
+  {key:'insurance', label:'Insurance'},
+  {key:'puc',       label:'PUC'},
+  {key:'permit',    label:'Permit'},
+  {key:'national_permit', label:'National Permit'},
+  {key:'fitness',   label:'Fitness'},
+];
+
+function renderVehicleInfoForm() {
+  // Already rendered from saved data
+}
+
+// editingVI: null = koi form khula nahi hai (sirf table dikh rahi hai)
+// number = us index wale vehicle ka form khula hai (add ya edit dono ke liye)
+let editingVI = null;
+
+function renderVehicleTable() {
+  const wrap = document.getElementById('vehicle-info-wrap');
+  const vehicles = appData?.vehicle_info || [];
+
+  if (!vehicles.length && editingVI === null) {
+    wrap.innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+      <button class="btn-pdf" onclick="addVehicle()">+ Vehicle Add Karo</button>
+      <span style="font-size:0.75rem;color:var(--muted);">
+        Expiry dates DD-Mon-YYYY format mein (e.g. 15-Aug-2026)
+      </span>
+    </div>
+    <p style="color:var(--muted);font-size:0.85rem;">Abhi tak koi vehicle add nahi hui.</p>
+    <div id="vi-cards"></div>`;
+    renderVehicleCards(vehicles);
+    return;
+  }
+
+  wrap.innerHTML = `
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+    <button class="btn-pdf" onclick="addVehicle()">+ Vehicle Add Karo</button>
+    <span style="font-size:0.75rem;color:var(--muted);">
+      Expiry dates DD-Mon-YYYY format mein (e.g. 15-Aug-2026)
+    </span>
+  </div>
+  <div id="vi-cards"></div>
+  ${vehicles.length ? `
+  <div class="table-wrap" style="margin-top:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>Account</th><th>Vehicle No</th>
+          <th>Insurance Expiry</th><th>PUC Expiry</th>
+          <th>Permit Expiry</th><th>National Permit Expiry</th><th>Fitness Expiry</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${vehicles.map((v,i) => `
+        <tr>
+          <td>${v.account||'-'}</td>
+          <td><b>${v.vehicle_no||'-'}</b></td>
+          ${DOC_FIELDS.map(f => `<td class="${expiryClass(v[f.key])}">${formatExpiry(v[f.key])}</td>`).join('')}
+          <td>
+            <button onclick="editVehicle(${i})" title="Edit"
+              style="background:none;border:none;cursor:pointer;font-size:0.95rem;">✏️</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>` : ''}`;
+  renderVehicleCards(vehicles);
+}
+
+function renderVehicleCards(vehicles) {
+  const grid = document.getElementById('vi-cards');
+  if (!grid) return;
+  grid.className = 'vi-grid';
+
+  // Sirf ek hi form dikhta hai — jo currently add/edit ho raha hai
+  if (editingVI === null || !vehicles[editingVI]) {
+    grid.innerHTML = '';
+    return;
+  }
+
+  const v = vehicles[editingVI];
+  const i = editingVI;
+  grid.innerHTML = `
+  <div class="vi-card">
+    <h4>
+      <span style="color:var(--muted);font-size:0.72rem;">Account:</span>
+      <input class="vi-input" style="width:80px;margin:0 8px;"
+        value="${v.account||''}" placeholder="TC/SA..."
+        onchange="updateVI(${i},'account',this.value)">
+      <span style="color:var(--muted);font-size:0.72rem;">Vehicle:</span>
+      <input class="vi-input" style="width:110px;margin-left:8px;"
+        value="${v.vehicle_no||''}" placeholder="GJ18BT..."
+        onchange="updateVI(${i},'vehicle_no',this.value)">
+    </h4>
+    ${DOC_FIELDS.map(f => `
+    <div class="vi-row">
+      <span class="vi-label">${f.label}</span>
+      <input class="vi-input" value="${v[f.key]||''}" placeholder="DD-Mon-YYYY"
+        onchange="updateVI(${i},'${f.key}',this.value)">
+    </div>`).join('')}
+    <div style="display:flex; gap:14px; margin-top:10px;">
+      <button onclick="saveVehicleInfo()"
+        style="font-size:0.78rem;font-weight:600;color:#fff;background:var(--accent, #4f8ef7);
+               border:none;border-radius:6px;padding:6px 14px;cursor:pointer;">
+        💾 Save
+      </button>
+      <button onclick="removeVI(${i})"
+        style="font-size:0.72rem;color:var(--red);background:none;border:none;cursor:pointer;">
+        🗑 Remove
+      </button>
+    </div>
+  </div>`;
+}
+
+let vehicleList = [];
+async function loadVehicleList() {
+  vehicleList = appData?.vehicle_info || [];
+}
+
+function addVehicle() {
+  vehicleList = appData?.vehicle_info || [];
+  vehicleList.push({account:'', vehicle_no:'', insurance:'', puc:'', permit:'', national_permit:'', fitness:''});
+  appData.vehicle_info = vehicleList;
+  editingVI = vehicleList.length - 1;   // isi naye vehicle ka form khulega
+  renderVehicleTable();
+}
+
+function editVehicle(i) {
+  editingVI = i;   // us row ke pencil icon se form khulega, pre-filled
+  renderVehicleTable();
+}
+
+function updateVI(i, key, val) {
+  if (!appData.vehicle_info) return;
+  appData.vehicle_info[i][key] = val;
+}
+
+function removeVI(i) {
+  appData.vehicle_info.splice(i, 1);
+  editingVI = null;
+  saveVehicleInfo();   // remove ke baad backend/cloud pe bhi turant reflect ho
+}
+
+async function saveVehicleInfo() {
+  try {
+    await fetch('/api/vehicle_info', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({vehicles: appData?.vehicle_info || []})
+    });
+    showToast('✅ Vehicle info save ho gayi!', 'success');
+    editingVI = null;   // save hote hi form band ho jaye, sirf table dikhe
+    await loadData();
+    renderVehicleTable();
+  } catch(e) {
+    showToast('❌ Save nahi hua!', 'error');
+  }
+}
+
+// ── Expiry helpers ─────────────────────────────────────
+function expiryClass(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return '';
+    const d = new Date(parseInt(parts[2]), months[parts[1].toLowerCase()], parseInt(parts[0]));
+    const diff = Math.floor((d - new Date()) / 86400000);
+    if (diff < 0)  return 'exp-red';
+    if (diff <= 30) return 'exp-yellow';
+    return 'exp-green';
+  } catch { return ''; }
+}
+
+function formatExpiry(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    const parts = dateStr.split('-');
+    const d = new Date(parseInt(parts[2]), months[parts[1].toLowerCase()], parseInt(parts[0]));
+    const diff = Math.floor((d - new Date()) / 86400000);
+    const suffix = diff < 0 ? ` (${Math.abs(diff)}d ago)` :
+                   diff === 0 ? ' (Today!)' : ` (${diff}d)`;
+    return dateStr + suffix;
+  } catch { return dateStr; }
+}
+
+// ── Custom period toggle ─────────────────────────────────
+function toggleCustomPeriod() {
+  const on = document.getElementById('custom-period-toggle').checked;
+  document.getElementById('custom-period-fields').style.display = on ? 'flex' : 'none';
+}
+
+// Convert <input type="date"> value (YYYY-MM-DD) to the "DD-Mon-YYYY"
+// format the scraper expects (e.g. 2026-06-05 -> 05-Jun-2026)
+function toScraperDate(isoDate) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const [y, m, d] = isoDate.split('-');
+  return `${d}-${months[parseInt(m,10)-1]}-${y}`;
+}
+
+// ── Refresh ────────────────────────────────────────────
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  const status = document.getElementById('refresh-status');
+
+  // Agar "Custom period" checked hai, to un dates ko use karo — warna
+  // backend apne aap default (pichla mahina) le lega
+  let body = {};
+  const useCustom = document.getElementById('custom-period-toggle')?.checked;
+  if (useCustom) {
+    const fromVal = document.getElementById('custom-from').value;
+    const toVal = document.getElementById('custom-to').value;
+    if (!fromVal || !toVal) {
+      showToast('❌ Custom period ke liye From aur To date dono chuno', 'error');
+      return;
+    }
+    body = { from_date: toScraperDate(fromVal), to_date: toScraperDate(toVal) };
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Updating...';
+  status.textContent = useCustom
+    ? `${body.from_date} se ${body.to_date} tak ka data aa rha hai... (2-3 min lag sakte hain)`
+    : 'TCI website se data aa rha hai... (2-3 min lag sakte hain)';
+
+  try {
+    await fetch('/api/refresh', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    // Poll for completion
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const res = await fetch('/api/status');
+      const st = await res.json();
+      if (!st.scraping) {
+        clearInterval(poll);
+        await loadData();
+        btn.disabled = false;
+        btn.textContent = '🔄 Data Update Karo';
+        status.textContent = '';
+        showToast('✅ Data update ho gaya!', 'success');
+        if (document.getElementById('page-trips').classList.contains('active')) {
+          renderTripTable(currentAcc);
+        }
+      }
+      if (attempts > 60) { clearInterval(poll); btn.disabled = false; }
+    }, 5000);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🔄 Data Update Karo';
+    showToast('❌ Error: ' + e.message, 'error');
+  }
+}
+
+async function checkStatus() {
+  try {
+    const res = await fetch('/api/status');
+    const st = await res.json();
+    const dot = document.getElementById('status-dot');
+    if (st.scraping) { dot.className = 'status-dot loading'; }
+    else { dot.className = 'status-dot'; }
+  } catch {}
+}
+
+function updateStatusBar() {
+  const lu = appData?.last_updated;
+  document.getElementById('last-updated').textContent =
+    lu ? `Updated: ${lu}` : 'Data nahi aaya abhi';
+}
+
+// ── PDF Download ───────────────────────────────────────
+function downloadPDF() {
+  const trips = appData?.trip_details?.[currentAcc] || [];
+  if (!trips.length) { showToast('Pehle data load karo!', 'error'); return; }
+
+  const {from, to} = getCurrentDateRange();
+  const accName = ACC_NAMES[currentAcc];
+  const fmt = n => '₹' + (n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // Vehicle ke hisaab se group karo
+  const byVehicle = {};
+  trips.forEach(t => {
+    const v = t.vehicle || 'Unknown';
+    if (!byVehicle[v]) byVehicle[v] = [];
+    byVehicle[v].push(t);
+  });
+  const vehicleNames = Object.keys(byVehicle).sort();
+
+  const grandNetLiab = trips.reduce((s,t)=>s+(t.net_liability||0),0);
+
+  let sections = '';
+  vehicleNames.forEach(vehicle => {
+    const vTrips = [...byVehicle[vehicle]].sort((a,b) =>
+      (a.tcs_date || '').localeCompare(b.tcs_date || ''));
+    const vNetLiab = vTrips.reduce((s,t)=>s+(t.net_liability||0),0);
+
+    sections += `
+    <h3>${vehicle} <span class="count">(${vTrips.length} trips)</span></h3>
+    <table>
+      <thead><tr>
+        <th>TCS No.</th><th>Branch</th><th>TCS Date</th><th>Dest</th><th>Close Date</th>
+        <th class="num">Liability</th><th class="num">GST</th><th class="num">Net Liability</th>
+        <th class="num">Penalty</th><th class="num">Handling</th>
+        <th class="num">Early Ded.</th><th class="num">GPS Ded.</th><th class="num">TDS Ded.</th>
+      </tr></thead>
+      <tbody>
+      ${vTrips.map(t=>`<tr>
+        <td>${t.tcs_no||'-'}</td><td>${t.tcs_branch||'-'}</td><td>${t.tcs_date||'-'}</td>
+        <td>${t.tcs_dest||'-'}</td><td>${t.close_date||'-'}</td>
+        <td class="num">${fmt(t.liability)}</td><td class="num">${fmt(t.gst_amt)}</td>
+        <td class="num">${fmt(t.net_liability)}</td>
+        <td class="num">${t.penalty?fmt(t.penalty):'-'}</td>
+        <td class="num">${t.handling?fmt(t.handling):'-'}</td>
+        <td class="num">${t.early_ded?fmt(t.early_ded):'-'}</td>
+        <td class="num">${t.gps_ded?fmt(t.gps_ded):'-'}</td>
+        <td class="num">${t.tds_ded?fmt(t.tds_ded):'-'}</td>
+      </tr>`).join('')}
+      </tbody>
+      <tfoot><tr class="total">
+        <td colspan="7">${vehicle} TOTAL</td>
+        <td class="num">${fmt(vNetLiab)}</td>
+        <td colspan="4"></td>
+      </tr></tfoot>
+    </table>`;
+  });
+
+  const html = `<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <style>
+    body{font-family:Arial,sans-serif;font-size:10px;margin:20px;}
+    h2{font-size:14px;margin-bottom:4px;}
+    h3{font-size:11px;margin:14px 0 4px 0;}
+    .count{color:#666;font-weight:normal;font-size:9px;}
+    .sub{color:#666;font-size:10px;margin-bottom:8px;}
+    .grand{font-size:11px;font-weight:bold;margin-bottom:16px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+    th{background:#1a1d27;color:white;padding:5px 6px;text-align:left;font-size:9px;}
+    td{padding:4px 6px;border-bottom:1px solid #eee;}
+    .num{text-align:right;}
+    .total{background:#f0f4ff;font-weight:bold;}
+    .footer{margin-top:16px;font-size:9px;color:#999;}
+  </style></head><body>
+  <h2>TCI Fleet Manager — Trip Details Report</h2>
+  <div class="sub">Account: ${accName} &nbsp;|&nbsp; Period: ${from} to ${to} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>
+  <div class="grand">${vehicleNames.length} vehicles &nbsp;|&nbsp; ${trips.length} total trips &nbsp;|&nbsp; Grand Net Liability: ${fmt(grandNetLiab)}</div>
+  ${sections}
+  <div class="footer">TCI Fleet Manager</div>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
+function downloadVehiclePDF() {
+  const vehicles = appData?.vehicle_info || [];
+  if (!vehicles.length) { showToast('Pehle vehicle info add karo!', 'error'); return; }
+
+  const html = `<!DOCTYPE html><html><head>
+  <meta charset="UTF-8">
+  <style>
+    body{font-family:Arial,sans-serif;font-size:11px;margin:20px;}
+    h2{font-size:14px;margin-bottom:12px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#1a1d27;color:white;padding:6px 8px;text-align:left;font-size:10px;}
+    td{padding:5px 8px;border-bottom:1px solid #eee;}
+    .ok{color:green;}.warn{color:orange;}.exp{color:red;}
+  </style></head><body>
+  <h2>TCI Fleet Manager — Vehicle Documents Report (${new Date().toLocaleDateString('en-IN')})</h2>
+  <table>
+    <thead><tr>
+      <th>Account</th><th>Vehicle No</th>
+      <th>Insurance</th><th>PUC</th><th>Permit</th><th>National Permit</th><th>Fitness</th>
+    </tr></thead>
+    <tbody>
+    ${vehicles.map(v=>`<tr>
+      <td>${v.account||'-'}</td><td><b>${v.vehicle_no||'-'}</b></td>
+      ${['insurance','puc','permit','national_permit','fitness'].map(f=>`<td>${v[f]||'-'}</td>`).join('')}
+    </tr>`).join('')}
+    </tbody>
+  </table>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
+// ── Toast ──────────────────────────────────────────────
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ── Start ──────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
