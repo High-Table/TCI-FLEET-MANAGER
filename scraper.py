@@ -250,6 +250,15 @@ def login(driver, username, password, max_login_attempts=3):
 
     if not supplier_ok:
         print("  ❌ SUPPLIER radio select NAHI ho paaya — login galat account type se ho sakta tha!")
+        # Debug ke liye screenshot + page HTML save karo, taaki dekh sakein
+        # cloud (headless) mein page kaisa dikh raha tha login fail hone
+        # ke waqt — kya ye asli login page hi tha ya koi block/error page
+        try:
+            driver.save_screenshot(f"debug_login_{username}.png")
+            with open(f"debug_login_{username}.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+        except Exception:
+            pass
         # Login rukwa do agar supplier select nahi hua — Employee default se
         # login karna galat data dega
         raise RuntimeError(
@@ -422,6 +431,14 @@ def scrape_account_trips(username, password, from_date, to_date):
 
     except Exception as e:
         print(f"  Scrape error: {e}")
+        # Debug ke liye screenshot + page HTML save karo — agar login ke
+        # andar hi save ho chuka ho to ye dobara try karega but koi harm nahi
+        try:
+            driver.save_screenshot(f"debug_{username}.png")
+            with open(f"debug_{username}.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+        except Exception:
+            pass
     finally:
         driver.quit()
 
