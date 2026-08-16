@@ -14,6 +14,7 @@ import time, datetime
 
 def get_driver():
     opts = webdriver.ChromeOptions()
+    opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-gpu")
