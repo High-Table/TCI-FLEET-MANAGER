@@ -38,3 +38,13 @@ jobs:
           FROM_DATE: ${{ github.event.inputs.from_date }}
           TO_DATE: ${{ github.event.inputs.to_date }}
         run: python actions_scraper.py
+
+      - name: Upload debug files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: |
+            debug_*.png
+            debug_*.html
+          if-no-files-found: ignore
