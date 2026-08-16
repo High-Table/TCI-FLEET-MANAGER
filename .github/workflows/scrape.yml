@@ -1,0 +1,40 @@
+name: TCI Scrape
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_date:
+        description: 'From date (DD-Mon-YYYY) - khali chhodo to pichla mahina use hoga'
+        required: false
+        default: ''
+      to_date:
+        description: 'To date (DD-Mon-YYYY) - khali chhodo to pichla mahina use hoga'
+        required: false
+        default: ''
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run scraper and push to Firebase
+        env:
+          TCI_ACCOUNTS: ${{ secrets.TCI_ACCOUNTS }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_DB_URL: ${{ secrets.FIREBASE_DB_URL }}
+          FIREBASE_EMAIL: ${{ secrets.FIREBASE_EMAIL }}
+          FIREBASE_PASSWORD: ${{ secrets.FIREBASE_PASSWORD }}
+          FROM_DATE: ${{ github.event.inputs.from_date }}
+          TO_DATE: ${{ github.event.inputs.to_date }}
+        run: python actions_scraper.py
