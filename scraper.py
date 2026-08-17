@@ -14,6 +14,7 @@ import time, datetime
 
 def get_driver():
     opts = webdriver.ChromeOptions()
+    opts.binary_location = "/usr/bin/chromium"
     opts.add_argument("--headless=new")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -22,7 +23,7 @@ def get_driver():
     opts.add_argument("--disable-notifications")
     opts.add_argument("--start-maximized")
     return webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()), options=opts)
+        service=Service("/usr/bin/chromedriver"), options=opts)
 
 
 # Is JS helper mein poora "supplier radio dhoondo aur select karo" logic hai.
@@ -71,8 +72,6 @@ function run(mode) {
     var radios = Array.prototype.slice.call(document.querySelectorAll("input[type='radio']"));
     if (!radios.length) return 'no_radios';
 
-    // Name attribute se group karo taaki sahi radio-group isolate ho jaaye
-    // (agar page pe aur bhi unrelated radio groups ho to unse confuse na ho)
     var groups = {};
     radios.forEach(function (r) {
         var key = r.name || '__noname__';
@@ -97,8 +96,6 @@ function run(mode) {
         return 'not_selected';
     }
 
-    // mode === 'select'
-    // Purana marker hata do (pichle attempt se bacha reh gaya ho to)
     radios.forEach(function (r) { r.removeAttribute('data-tci-target'); });
 
     for (var i = 0; i < candidateGroup.length; i++) {
@@ -112,8 +109,6 @@ function run(mode) {
         }
     }
 
-    // Fallback — "supplier" text kahin na mila, to jo default checked
-    // NAHI hai wo select kar do (Employee/Supplier: sirf 2 hi option)
     if (candidateGroup.length === 2) {
         var target = null;
         for (var j = 0; j < candidateGroup.length; j++) {
@@ -134,14 +129,6 @@ return run(arguments[0]);
 
 
 def click_radio(driver, keyword="SUPPLIER", max_retries=8):
-    """
-    Supplier radio select karta hai. `keyword` param backward-compatibility
-    ke liye rakha hai par ab use nahi hota — logic hamesha "supplier" text
-    dhoondta hai (ya text na mile to non-default radio fallback se select
-    karta hai). Har attempt ke baad verify karta hai ki sach mein select
-    hua ya nahi. Retry loop isliye hai kyunki page load timing kabhi kabhi
-    radio buttons ready hone se pehle try ho jaata hai.
-    """
     def is_target_selected():
         try:
             return driver.execute_script(_SELECT_SUPPLIER_JS, 'check') == 'selected'
@@ -168,12 +155,6 @@ def click_radio(driver, keyword="SUPPLIER", max_retries=8):
         if is_target_selected():
             return True
 
-        # Real (native) click bhi try karo — kuch sites sirf JS-dispatched
-        # event trust nahi karti, genuine mouse click chahiye hoti hai.
-        # `_SELECT_SUPPLIER_JS` upar wale call mein jis radio ko select
-        # karne ki koshish ki thi, usi ko 'data-tci-target' marker se
-        # nishaan laga deta hai — sirf usi ek radio pe native click karo,
-        # baaki radios ko chhedo mat.
         try:
             targets = driver.find_elements(By.XPATH, "//input[@type='radio'][@data-tci-target='1']")
             for r in targets:
@@ -197,11 +178,7 @@ def click_radio(driver, keyword="SUPPLIER", max_retries=8):
 
 
 def _fill_and_select_supplier(driver, username, password):
-    """Ek attempt: page load karo, username/password bharo, supplier radio
-    select karo. Return True/False (supplier select hua ya nahi)."""
     driver.get("https://tciexpressemployee.in/myexpress.asp")
-    # Static sleep ke bajaye document readyState ka wait — slow connection
-    # pe zyada reliable hai
     try:
         WebDriverWait(driver, 15).until(
             lambda d: d.execute_script("return document.readyState") == "complete"
@@ -230,15 +207,6 @@ def _fill_and_select_supplier(driver, username, password):
 
 
 def login(driver, username, password, max_login_attempts=3):
-    """
-    Supplier radio select karke login karta hai. Agar supplier select nahi
-    hota to poora attempt (fresh page load se) dobara try karta hai —
-    kyunki yeh timing-dependent nikla (manually select karne pe kaam kar
-    jaata tha, jisse pata chala ki extra time/retry se theek ho jaata hai).
-    Sirf tabhi RuntimeError raise karta hai jab saare attempts fail ho jaayein
-    — Employee (default) ke saath login karke galat data laane se better hai
-    task fail karna.
-    """
     supplier_ok = False
     for attempt in range(1, max_login_attempts + 1):
         supplier_ok = _fill_and_select_supplier(driver, username, password)
@@ -250,24 +218,17 @@ def login(driver, username, password, max_login_attempts=3):
 
     if not supplier_ok:
         print("  ❌ SUPPLIER radio select NAHI ho paaya — login galat account type se ho sakta tha!")
-        # Debug ke liye screenshot + page HTML save karo, taaki dekh sakein
-        # cloud (headless) mein page kaisa dikh raha tha login fail hone
-        # ke waqt — kya ye asli login page hi tha ya koi block/error page
         try:
             driver.save_screenshot(f"debug_login_{username}.png")
             with open(f"debug_login_{username}.html", "w", encoding="utf-8") as f:
                 f.write(driver.page_source)
         except Exception:
             pass
-        # Login rukwa do agar supplier select nahi hua — Employee default se
-        # login karna galat data dega
         raise RuntimeError(
             f"SUPPLIER radio select nahi ho paaya ({username}), {max_login_attempts} attempts ke baad bhi. "
             "Login is liye rok diya — Employee ke saath login galat hota."
         )
 
-    # Login button click karne se theek pehle ek aakhri safety check —
-    # agar kisi wajah se selection wapas Employee ho gaya ho to last try
     if not click_radio(driver, max_retries=2):
         raise RuntimeError(
             f"SUPPLIER radio submit se theek pehle unselect ho gaya ({username}). "
@@ -282,7 +243,6 @@ def login(driver, username, password, max_login_attempts=3):
 
 
 def n(s):
-    """String amount ko float mein convert karo, safely"""
     try:
         return float(str(s).replace(',', '').strip())
     except:
@@ -296,7 +256,6 @@ def scrape_account_trips(username, password, from_date, to_date):
     try:
         login(driver, username, password)
 
-        # Option 6 - Trip Closing Detail
         found_link = False
         for txt in ["6. Trip Closing Detail", "Trip Closing Detail", "Trip Closing"]:
             try:
@@ -312,7 +271,6 @@ def scrape_account_trips(username, password, from_date, to_date):
             driver.save_screenshot(f"trip_link_error_{username}.png")
             return []
 
-        # Date fill — From Date aur To Date
         time.sleep(2)
         date_inputs = driver.find_elements(By.XPATH, "//input[@type='text']")
         if len(date_inputs) >= 2:
@@ -330,7 +288,6 @@ def scrape_account_trips(username, password, from_date, to_date):
         else:
             print(f"  ⚠ Date fields nahi mile ({len(date_inputs)} mile)")
 
-        # Show button
         try:
             show = driver.find_element(By.XPATH,
                 "//input[@value='Show' or @value='show'] | //button[contains(text(),'Show')]")
@@ -338,17 +295,15 @@ def scrape_account_trips(username, password, from_date, to_date):
         except:
             print("  ⚠ Show button nahi mila")
 
-        # Alert — "Would you like to submit" → OK/Yes
         try:
             alert = WebDriverWait(driver, 5).until(EC.alert_is_present())
             alert.accept()
             time.sleep(4)
         except:
-            pass  # Alert na aaye to bhi theek hai
+            pass
 
         time.sleep(3)
 
-        # Data table dhoondo
         tables = driver.find_elements(By.TAG_NAME, "table")
         data_table = None
         for table in tables:
@@ -364,7 +319,6 @@ def scrape_account_trips(username, password, from_date, to_date):
 
         rows = data_table.find_elements(By.TAG_NAME, "tr")
 
-        # Header row dhoondo — column positions pata karne ke liye
         headers = []
         for row in rows[:3]:
             cells = [c.text.strip().upper().replace('\n', ' ')
@@ -379,7 +333,6 @@ def scrape_account_trips(username, password, from_date, to_date):
                     if k in h: return i
             return -1
 
-        # Photo ke saare 13 columns ke liye index nikalo
         veh_col      = ci(["VEHICLE NO", "VEHICLE"])
         tcsno_col    = ci(["TCS NO"])
         branch_col   = ci(["TCS BRANCH", "BRANCH"])
@@ -395,7 +348,6 @@ def scrape_account_trips(username, password, from_date, to_date):
         gps_col      = ci(["GPS AMOUNT", "GPS"])
         tds_col      = ci(["TDS DEDUCTION", "TDS"])
 
-        # Data rows — har trip apni alag row, koi grouping nahi
         for row in rows[1:]:
             cells = [td.text.strip()
                      for td in row.find_elements(By.TAG_NAME, "td")]
@@ -408,7 +360,6 @@ def scrape_account_trips(username, password, from_date, to_date):
             vehicle = g(veh_col)
             if not vehicle:
                 continue
-            # Header ya empty rows skip karo
             if vehicle.upper() in ["VEHICLE NO", "SR NO", "SR", "#"]:
                 continue
 
@@ -431,8 +382,6 @@ def scrape_account_trips(username, password, from_date, to_date):
 
     except Exception as e:
         print(f"  Scrape error: {e}")
-        # Debug ke liye screenshot + page HTML save karo — agar login ke
-        # andar hi save ho chuka ho to ye dobara try karega but koi harm nahi
         try:
             driver.save_screenshot(f"debug_{username}.png")
             with open(f"debug_{username}.html", "w", encoding="utf-8") as f:
