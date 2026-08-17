@@ -7,6 +7,7 @@
 <title>TCI Fleet Manager</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -55,10 +56,15 @@
 
   .vehicle-section { margin-bottom:16px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--card); }
   .vehicle-header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px;
-    background:#1e2133; border-bottom:1px solid var(--border); }
+    background:#1e2133; border-bottom:1px solid var(--border); gap:10px; }
   .vehicle-name { font-weight:700; font-size:0.88rem; }
   .vehicle-trip-count { background:rgba(79,142,247,0.15); color:var(--accent); border-radius:20px;
     padding:2px 10px; font-weight:700; font-size:0.72rem; }
+  .vehicle-header-right { display:flex; align-items:center; gap:8px; }
+
+  .icon-btn { background:rgba(255,255,255,0.08); border:1px solid var(--border); border-radius:7px;
+    padding:6px 9px; cursor:pointer; font-size:0.72rem; color:var(--text); display:inline-flex; align-items:center; gap:4px; }
+  .icon-btn:active { background:rgba(255,255,255,0.16); }
 
   /* Table always scrolls horizontally - same as laptop dashboard */
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -77,6 +83,27 @@
   .exp-green { color: var(--green); font-weight: 600; }
   .exp-orange { color: #f97316; font-weight: 600; }
   .exp-red { color: var(--red); font-weight: 600; }
+  .vi-actions { display:flex; gap:6px; }
+
+  .add-vehicle-btn { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none;
+    border-radius:8px; padding:9px 16px; font-weight:600; font-size:0.82rem; cursor:pointer; margin-bottom:14px; }
+
+  /* ── Modal form (Add/Edit vehicle) ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200;
+    align-items:flex-start; justify-content:center; padding:40px 14px; overflow-y:auto; }
+  .modal-overlay.active { display:flex; }
+  .modal-box { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px;
+    max-width:420px; width:100%; }
+  .modal-box h3 { font-size:1rem; margin-bottom:14px; }
+  .modal-box label { font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.02em;
+    display:block; margin:10px 0 4px; }
+  .modal-box input { width:100%; padding:9px 11px; background:#11141c; border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:0.88rem; }
+  .modal-actions { display:flex; gap:10px; margin-top:18px; }
+  .modal-actions button { flex:1; padding:10px; border:none; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem; }
+  .btn-save { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+  .btn-cancel { background:rgba(255,255,255,0.08); color:var(--text); border:1px solid var(--border) !important; }
+  .btn-delete-confirm { background:var(--red); color:#fff; }
 
   .login-box { max-width:340px; margin:30vh auto 0; padding:24px; }
   .login-box input { width:100%; padding:10px 12px; margin-bottom:10px; background:#11141c;
@@ -119,6 +146,18 @@
   </div>
 </div>
 
+<!-- Add/Edit Vehicle modal -->
+<div class="modal-overlay" id="vehicleModal">
+  <div class="modal-box">
+    <h3 id="vehicleModalTitle">Add Vehicle</h3>
+    <div id="vehicleFormFields"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeVehicleForm()">Cancel</button>
+      <button class="btn-save" onclick="saveVehicle()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="config.js"></script>
 <script>
 const CACHE_KEY = 'tci_cached_data';
@@ -128,6 +167,7 @@ const ACC_NAMES_DEFAULT = { MA:'Manish', SA:'Suresh', SB:'Subhita', TC:'Tushar',
 let appData = null;
 let currentAcc = null;
 let selectedVehicle = {};
+let editingVehicleIndex = null;
 
 function setStatus(text, online){
   document.getElementById('statusText').textContent = text;
@@ -150,7 +190,6 @@ async function firebaseLogin(email, password){
 }
 
 // Silently exchange the long-lived refresh token for a fresh idToken.
-// This is what keeps the app "always logged in" without asking again.
 async function refreshIdToken(){
   const refreshToken = localStorage.getItem('tci_refresh_token');
   if(!refreshToken) return null;
@@ -165,10 +204,36 @@ async function refreshIdToken(){
   return data.id_token;
 }
 
+async function getValidIdToken(){
+  let idToken = localStorage.getItem('tci_id_token');
+  return idToken;
+}
+
 async function fetchData(idToken){
   const res = await fetch(`${FIREBASE_DB_URL}/tci_data.json?auth=${idToken}`);
   if(!res.ok) throw new Error('Fetch failed');
   return res.json();
+}
+
+// Writes the full vehicle_info array back to Firebase (doesn't touch trip_details/last_updated).
+async function writeVehicleInfo(vehicles){
+  let idToken = localStorage.getItem('tci_id_token');
+  async function attempt(token){
+    const res = await fetch(`${FIREBASE_DB_URL}/tci_data/vehicle_info.json?auth=${token}`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(vehicles)
+    });
+    if(!res.ok) throw new Error('Write failed');
+    return res.json();
+  }
+  try{
+    await attempt(idToken);
+  } catch(e){
+    const newToken = await refreshIdToken();
+    if(!newToken) throw e;
+    await attempt(newToken);
+  }
 }
 
 function accKeysAndNames(data){
@@ -254,7 +319,7 @@ function renderTripTable(acc, names){
     <div class="veh-tabs">${tabsHtml}</div>
     <div id="veh-table-area"></div>`;
 
-  renderVehicleTripTable(acc, activeVehicle, byVehicle);
+  renderVehicleTripTable(acc, activeVehicle, byVehicle, names[acc] || acc);
 }
 
 function selectVehicle(acc, vehicle){
@@ -269,10 +334,11 @@ function selectVehicle(acc, vehicle){
   document.querySelectorAll('.veh-tab').forEach(el => {
     el.classList.toggle('active', el.textContent.trim().startsWith('🚛 ' + vehicle));
   });
-  renderVehicleTripTable(acc, vehicle, byVehicle);
+  const { names } = accKeysAndNames(appData);
+  renderVehicleTripTable(acc, vehicle, byVehicle, names[acc] || acc);
 }
 
-function renderVehicleTripTable(acc, vehicle, byVehicle){
+function renderVehicleTripTable(acc, vehicle, byVehicle, accDisplayName){
   const area = document.getElementById('veh-table-area');
   if(!area || !byVehicle[vehicle]) return;
 
@@ -292,9 +358,12 @@ function renderVehicleTripTable(acc, vehicle, byVehicle){
   <div class="vehicle-section">
     <div class="vehicle-header">
       <span class="vehicle-name">🚛 ${vehicle}</span>
-      <span class="vehicle-trip-count">${vTrips.length} trips</span>
+      <div class="vehicle-header-right">
+        <span class="vehicle-trip-count">${vTrips.length} trips</span>
+        <button class="icon-btn" onclick="shareVehiclePdf('${acc}','${vehicle}')">📤 Share PDF</button>
+      </div>
     </div>
-    <div class="table-scroll">
+    <div class="table-scroll" id="vehTableScroll">
     <table class="trip-table">
       <thead><tr>
         <th>Sr No.</th><th>TCS No.</th><th>TCS Branch</th><th>TCS Date</th><th>TCS Dest</th><th>Close Date</th>
@@ -332,6 +401,90 @@ function renderVehicleTripTable(acc, vehicle, byVehicle){
     </table>
     </div>
   </div>`;
+}
+
+// ── Share/PDF ──────────────────────────────────────────────────────────
+// Builds a light-themed printable version of the vehicle's trip table
+// (dark UI theme doesn't print well) and shares it as a PDF via the
+// native share sheet, falling back to a plain download if share isn't
+// supported.
+function shareVehiclePdf(acc, vehicle){
+  const trips = (appData?.trip_details?.[acc] || [])
+    .filter(t => (t.vehicle || 'Unknown') === vehicle)
+    .sort((a,b)=>(a.tcs_date||'').localeCompare(b.tcs_date||''));
+  const { names } = accKeysAndNames(appData);
+  const accName = names[acc] || acc;
+
+  const total = {
+    liability: trips.reduce((s,t)=>s+(t.liability||0),0),
+    gst: trips.reduce((s,t)=>s+(t.gst_amt||0),0),
+    netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
+    penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
+  };
+
+  const printDiv = document.createElement('div');
+  printDiv.style.cssText = 'background:#fff; color:#111; padding:20px; font-family:Segoe UI,system-ui,sans-serif; width:900px;';
+  printDiv.innerHTML = `
+    <h2 style="margin-bottom:4px;">TCI Fleet Manager — ${vehicle}</h2>
+    <div style="color:#555; margin-bottom:14px; font-size:13px;">Account: ${accName} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>
+    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+      <thead><tr style="background:#eee;">
+        <th style="border:1px solid #ccc; padding:5px;">Sr</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS No</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS Date</th>
+        <th style="border:1px solid #ccc; padding:5px;">Close Date</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Liability</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GST</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Net Liability</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Penalty</th>
+      </tr></thead>
+      <tbody>
+        ${trips.map((t,i) => `
+        <tr>
+          <td style="border:1px solid #ccc; padding:5px;">${i+1}</td>
+          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_no||'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_date||'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px;">${t.close_date||'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.liability)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.gst_amt)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.net_liability)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.penalty?'₹'+fmt(t.penalty):'-'}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#f5f5f5; font-weight:bold;">
+          <td colspan="4" style="border:1px solid #ccc; padding:5px;">TOTAL</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.liability)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.gst)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.netLiability)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.penalty)}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  const opt = {
+    margin: 10,
+    filename: `${vehicle}_trips.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+  };
+
+  html2pdf().set(opt).from(printDiv).outputPdf('blob').then(async (blob) => {
+    const file = new File([blob], `${vehicle}_trips.pdf`, { type: 'application/pdf' });
+    if(navigator.canShare && navigator.canShare({ files: [file] })){
+      try{
+        await navigator.share({ files: [file], title: `${vehicle} Trip Report`, text: `${accName} — ${vehicle} trip report` });
+        return;
+      } catch(e){ /* user cancelled or share failed — fall through to download */ }
+    }
+    // Fallback: plain download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${vehicle}_trips.pdf`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
 }
 
 const VEHICLE_FIELDS = [
@@ -374,23 +527,96 @@ function formatExpiry(dateStr){
 function renderVehicleInfo(){
   const vehicles = appData?.vehicle_info || [];
   const el = document.getElementById('section-vehicles');
+
+  let html = '<button class="add-vehicle-btn" onclick="openVehicleForm()">+ Add Vehicle</button>';
+
   if(!vehicles.length){
-    el.innerHTML = '<div class="empty">Vehicle info nahi hai.</div>';
+    html += '<div class="empty">Vehicle info nahi hai.</div>';
+    el.innerHTML = html;
     return;
   }
-  let html = '<div class="card"><div class="table-scroll"><table class="vi-table"><thead><tr>' +
-    VEHICLE_FIELDS.map(f=>`<th>${f.label}</th>`).join('') + '</tr></thead><tbody>';
-  for(const v of vehicles){
+
+  html += '<div class="card"><div class="table-scroll"><table class="vi-table"><thead><tr>' +
+    VEHICLE_FIELDS.map(f=>`<th>${f.label}</th>`).join('') + '<th>Actions</th></tr></thead><tbody>';
+  vehicles.forEach((v, idx) => {
     html += '<tr>' + VEHICLE_FIELDS.map(f=>{
       const val = v[f.key];
       if(DATE_FIELD_KEYS.includes(f.key)){
         return `<td class="${expiryClass(val)}">${formatExpiry(val)}</td>`;
       }
       return `<td>${val ?? '-'}</td>`;
-    }).join('') + '</tr>';
-  }
+    }).join('');
+    html += `<td><div class="vi-actions">
+        <button class="icon-btn" onclick="openVehicleForm(${idx})">✏️</button>
+        <button class="icon-btn" onclick="confirmDeleteVehicle(${idx})">🗑️</button>
+      </div></td></tr>`;
+  });
   html += '</tbody></table></div></div>';
   el.innerHTML = html;
+}
+
+// ── Add / Edit vehicle form ───────────────────────────────────────────
+function openVehicleForm(idx){
+  editingVehicleIndex = (typeof idx === 'number') ? idx : null;
+  const vehicles = appData?.vehicle_info || [];
+  const existing = editingVehicleIndex !== null ? vehicles[editingVehicleIndex] : {};
+
+  document.getElementById('vehicleModalTitle').textContent = editingVehicleIndex !== null ? 'Edit Vehicle' : 'Add Vehicle';
+  document.getElementById('vehicleFormFields').innerHTML = VEHICLE_FIELDS.map(f => `
+    <label>${f.label}</label>
+    <input type="text" id="vf_${f.key}" value="${existing[f.key] ?? ''}" placeholder="${DATE_FIELD_KEYS.includes(f.key) ? 'DD-Mon-YYYY' : ''}">
+  `).join('');
+
+  document.getElementById('vehicleModal').classList.add('active');
+}
+
+function closeVehicleForm(){
+  document.getElementById('vehicleModal').classList.remove('active');
+  editingVehicleIndex = null;
+}
+
+async function saveVehicle(){
+  const entry = {};
+  VEHICLE_FIELDS.forEach(f => {
+    entry[f.key] = document.getElementById(`vf_${f.key}`).value.trim();
+  });
+
+  const vehicles = [...(appData?.vehicle_info || [])];
+  if(editingVehicleIndex !== null){
+    vehicles[editingVehicleIndex] = entry;
+  } else {
+    vehicles.push(entry);
+  }
+
+  try{
+    await writeVehicleInfo(vehicles);
+    appData.vehicle_info = vehicles;
+    localStorage.setItem(CACHE_KEY, JSON.stringify(appData));
+    closeVehicleForm();
+    renderVehicleInfo();
+  } catch(e){
+    alert('Save fail hua, phir se try karo. (' + e.message + ')');
+  }
+}
+
+function confirmDeleteVehicle(idx){
+  const vehicles = appData?.vehicle_info || [];
+  const v = vehicles[idx];
+  if(!confirm(`Pakka delete karna hai? (${v?.vehicle_no || 'Vehicle'})`)) return;
+  deleteVehicle(idx);
+}
+
+async function deleteVehicle(idx){
+  const vehicles = [...(appData?.vehicle_info || [])];
+  vehicles.splice(idx, 1);
+  try{
+    await writeVehicleInfo(vehicles);
+    appData.vehicle_info = vehicles;
+    localStorage.setItem(CACHE_KEY, JSON.stringify(appData));
+    renderVehicleInfo();
+  } catch(e){
+    alert('Delete fail hua, phir se try karo. (' + e.message + ')');
+  }
 }
 
 async function loadData(){
