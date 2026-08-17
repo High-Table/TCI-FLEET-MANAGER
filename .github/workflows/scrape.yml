@@ -42,4 +42,6 @@ jobs:
           path: |
             debug_*.png
             debug_*.html
+            trip_link_error_*.png
+            trip_table_error_*.png
           if-no-files-found: ignore
