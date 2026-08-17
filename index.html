@@ -112,6 +112,30 @@
     background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; cursor:pointer; }
   .msg { font-size:0.75rem; color:var(--muted); margin-top:8px; text-align:center; }
   .empty { color:var(--muted); font-size:0.85rem; text-align:center; padding:30px 10px; }
+
+  /* ── Home page (Update Now + nav cards) ── */
+  .update-btn { width:100%; background:#ec4899; color:#fff; border:none; border-radius:8px; height:48px;
+    font-size:0.95rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px;
+    margin-bottom:14px; cursor:pointer; }
+  .update-btn:disabled { opacity:0.7; }
+  .range-box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:20px; }
+  .range-fields { display:none; flex-direction:column; gap:8px; margin-top:10px; }
+  .range-fields.show { display:flex; }
+  .range-fields input { width:100%; padding:8px 10px; background:#11141c; border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:0.85rem; }
+  .range-err { display:none; font-size:0.72rem; color:var(--red); }
+  .range-err.show { display:block; }
+  .nav-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  .nav-card { text-align:left; background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:16px 12px; display:flex; flex-direction:column; gap:10px; cursor:pointer; min-width:0; }
+  .nav-card:active { background:#1e2133; }
+  .nav-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .nav-icon svg { width:20px; height:20px; }
+  .nav-title { font-weight:600; font-size:0.85rem; }
+  .nav-sub { font-size:0.68rem; color:var(--muted); margin-top:2px; }
+  .footer-credit { text-align:center; font-size:0.7rem; color:var(--muted); padding-top:14px;
+    border-top:1px solid var(--border); margin-top:10px; }
+  .back-link { display:inline-block; margin-bottom:14px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -133,16 +157,64 @@
 
   <!-- Data view -->
   <div id="dataView" style="display:none;">
-    <div class="tabs">
-      <div class="tab active" data-tab="trips" onclick="switchTab('trips')">Trip Details</div>
-      <div class="tab" data-tab="vehicles" onclick="switchTab('vehicles')">Vehicle Info</div>
+
+    <!-- Home page -->
+    <div id="homeView">
+      <button id="updateBtn" class="update-btn" onclick="triggerUpdate()">🔄 Update Now</button>
+
+      <div class="range-box">
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--muted);">
+          <input type="checkbox" id="customRange" onchange="toggleRangeFields()"> Custom date range
+        </label>
+        <div id="rangeFields" class="range-fields">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">From</span>
+            <input type="date" id="fromDate">
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">To</span>
+            <input type="date" id="toDate">
+          </div>
+          <div id="rangeErr" class="range-err">Dono dates bharo pehle</div>
+        </div>
+      </div>
+
+      <div class="nav-grid">
+        <button class="nav-card" onclick="showSection('trips')">
+          <div class="nav-icon" style="background:#a16207;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fef9c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="nav-title">Trip Details</div>
+            <div class="nav-sub">5 accounts</div>
+          </div>
+        </button>
+        <button class="nav-card" onclick="showSection('vehicles')">
+          <div class="nav-icon" style="background:#ffedd5;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          </div>
+          <div>
+            <div class="nav-title">Vehicle Details</div>
+            <div class="nav-sub">Docs and expiry</div>
+          </div>
+        </button>
+      </div>
+
+      <div class="footer-credit">Designed by Manish Chaudhari</div>
     </div>
 
-    <div id="section-trips" class="section active">
+    <!-- Trip Details section -->
+    <div id="section-trips" class="section">
+      <div class="tab back-link" onclick="showHome()">← Back</div>
       <div class="acc-tabs" id="acc-tabs"></div>
       <div id="trip-table-wrap"></div>
     </div>
-    <div id="section-vehicles" class="section"></div>
+
+    <!-- Vehicle Details section -->
+    <div id="section-vehicles" class="section">
+      <div class="tab back-link" onclick="showHome()">← Back</div>
+      <div id="vehicles-inner"></div>
+    </div>
   </div>
 </div>
 
@@ -163,6 +235,7 @@
 const CACHE_KEY = 'tci_cached_data';
 const ACC_KEYS_DEFAULT = ['MA','SA','SB','TC','BJ'];
 const ACC_NAMES_DEFAULT = { MA:'Manish', SA:'Suresh', SB:'Subhita', TC:'Tushar', BJ:'Bhojraj' };
+const WORKER_URL = 'https://mezvontransport.manishchoudhary1094.workers.dev/';
 
 let appData = null;
 let currentAcc = null;
@@ -174,10 +247,67 @@ function setStatus(text, online){
   document.getElementById('statusDot').className = 'status-dot' + (online ? '' : ' offline');
 }
 
-function switchTab(name){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
-  document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active', s.id==='section-'+name));
+// ── Home page navigation ──────────────────────────────────────────────
+function showHome(){
+  document.getElementById('homeView').style.display = 'block';
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+}
+
+function showSection(name){
+  document.getElementById('homeView').style.display = 'none';
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + name));
   if(name === 'vehicles') renderVehicleInfo();
+}
+
+function toggleRangeFields(){
+  const checked = document.getElementById('customRange').checked;
+  document.getElementById('rangeFields').classList.toggle('show', checked);
+  document.getElementById('rangeErr').classList.remove('show');
+}
+
+function formatDateForScrape(yyyyMmDd){
+  const [y,m,d] = yyyyMmDd.split('-');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d}-${months[parseInt(m,10)-1]}-${y}`;
+}
+
+async function triggerUpdate(){
+  const btn = document.getElementById('updateBtn');
+  const checked = document.getElementById('customRange').checked;
+  let body = {};
+
+  if(checked){
+    const from = document.getElementById('fromDate').value;
+    const to = document.getElementById('toDate').value;
+    if(!from || !to){
+      document.getElementById('rangeErr').classList.add('show');
+      return;
+    }
+    document.getElementById('rangeErr').classList.remove('show');
+    body = { from_date: formatDateForScrape(from), to_date: formatDateForScrape(to) };
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Updating...';
+  try{
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    if(!res.ok) throw new Error('Trigger failed');
+    setStatus('Update shuru ho gaya — kuch minute mein naya data aayega', true);
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      await loadData();
+      if(attempts >= 12) clearInterval(poll);
+    }, 20000);
+  } catch(e){
+    alert('Update start nahi ho paaya: ' + e.message);
+  } finally {
+    setTimeout(()=>{ btn.disabled=false; btn.textContent='🔄 Update Now'; }, 8000);
+  }
 }
 
 async function firebaseLogin(email, password){
@@ -404,10 +534,6 @@ function renderVehicleTripTable(acc, vehicle, byVehicle, accDisplayName){
 }
 
 // ── Share/PDF ──────────────────────────────────────────────────────────
-// Builds a light-themed printable version of the vehicle's trip table
-// (dark UI theme doesn't print well) and shares it as a PDF via the
-// native share sheet, falling back to a plain download if share isn't
-// supported.
 function shareVehiclePdf(acc, vehicle){
   const trips = (appData?.trip_details?.[acc] || [])
     .filter(t => (t.vehicle || 'Unknown') === vehicle)
@@ -478,7 +604,6 @@ function shareVehiclePdf(acc, vehicle){
         return;
       } catch(e){ /* user cancelled or share failed — fall through to download */ }
     }
-    // Fallback: plain download
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = `${vehicle}_trips.pdf`;
@@ -526,7 +651,7 @@ function formatExpiry(dateStr){
 
 function renderVehicleInfo(){
   const vehicles = appData?.vehicle_info || [];
-  const el = document.getElementById('section-vehicles');
+  const el = document.getElementById('vehicles-inner');
 
   let html = '<button class="add-vehicle-btn" onclick="openVehicleForm()">+ Add Vehicle</button>';
 
@@ -628,8 +753,6 @@ async function loadData(){
     setStatus('Updated: ' + (data?.last_updated || '—'), true);
     render(data);
   } catch(e){
-    // idToken expired (happens ~hourly) — silently refresh using the
-    // long-lived refresh token instead of asking the user to log in again
     try{
       const newToken = await refreshIdToken();
       if(newToken){
