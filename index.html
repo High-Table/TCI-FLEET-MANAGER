@@ -160,25 +160,6 @@
 
     <!-- Home page -->
     <div id="homeView">
-      <button id="updateBtn" class="update-btn" onclick="triggerUpdate()">🔄 Update Now</button>
-
-      <div class="range-box">
-        <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--muted);">
-          <input type="checkbox" id="customRange" onchange="toggleRangeFields()"> Custom date range
-        </label>
-        <div id="rangeFields" class="range-fields">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:0.72rem; color:var(--muted); width:34px;">From</span>
-            <input type="date" id="fromDate">
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:0.72rem; color:var(--muted); width:34px;">To</span>
-            <input type="date" id="toDate">
-          </div>
-          <div id="rangeErr" class="range-err">Dono dates bharo pehle</div>
-        </div>
-      </div>
-
       <div class="nav-grid">
         <button class="nav-card" onclick="showSection('trips')">
           <div class="nav-icon" style="background:#a16207;">
@@ -198,6 +179,25 @@
             <div class="nav-sub">Docs and expiry</div>
           </div>
         </button>
+      </div>
+
+      <button id="updateBtn" class="update-btn" onclick="triggerUpdate()" style="margin-top:14px;">🔄 Update Now</button>
+
+      <div class="range-box">
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--muted);">
+          <input type="checkbox" id="customRange" onchange="toggleRangeFields()"> Custom date range
+        </label>
+        <div id="rangeFields" class="range-fields">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">From</span>
+            <input type="date" id="fromDate">
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">To</span>
+            <input type="date" id="toDate">
+          </div>
+          <div id="rangeErr" class="range-err">Dono dates bharo pehle</div>
+        </div>
       </div>
 
       <div class="footer-credit">Designed by Manish Chaudhari</div>
@@ -272,6 +272,8 @@ function formatDateForScrape(yyyyMmDd){
 }
 
 async function triggerUpdate(){
+  if(!confirm('Would you like to proceed?')) return;
+
   const btn = document.getElementById('updateBtn');
   const checked = document.getElementById('customRange').checked;
   let body = {};
@@ -546,44 +548,65 @@ function shareVehiclePdf(acc, vehicle){
     gst: trips.reduce((s,t)=>s+(t.gst_amt||0),0),
     netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
     penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
+    handling: trips.reduce((s,t)=>s+(t.handling||0),0),
+    early: trips.reduce((s,t)=>s+(t.early_ded||0),0),
+    gps: trips.reduce((s,t)=>s+(t.gps_ded||0),0),
+    tds: trips.reduce((s,t)=>s+(t.tds_ded||0),0),
   };
 
+  // Same columns as the on-screen trip table — nothing left out.
   const printDiv = document.createElement('div');
-  printDiv.style.cssText = 'background:#fff; color:#111; padding:20px; font-family:Segoe UI,system-ui,sans-serif; width:900px;';
+  printDiv.style.cssText = 'background:#fff; color:#111; padding:20px; font-family:Segoe UI,system-ui,sans-serif; width:1400px;';
   printDiv.innerHTML = `
     <h2 style="margin-bottom:4px;">TCI Fleet Manager — ${vehicle}</h2>
     <div style="color:#555; margin-bottom:14px; font-size:13px;">Account: ${accName} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>
-    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+    <table style="width:100%; border-collapse:collapse; font-size:10px;">
       <thead><tr style="background:#eee;">
-        <th style="border:1px solid #ccc; padding:5px;">Sr</th>
-        <th style="border:1px solid #ccc; padding:5px;">TCS No</th>
+        <th style="border:1px solid #ccc; padding:5px;">Sr No.</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS No.</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS Branch</th>
         <th style="border:1px solid #ccc; padding:5px;">TCS Date</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS Dest</th>
         <th style="border:1px solid #ccc; padding:5px;">Close Date</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Liability</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GST</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Liability Amt</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GST Amt</th>
         <th style="border:1px solid #ccc; padding:5px; text-align:right;">Net Liability</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Penalty</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Penalty Ded.</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Handling Amt</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Early Payment Ded.</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GPS Amt Ded.</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">TDS Ded.</th>
       </tr></thead>
       <tbody>
         ${trips.map((t,i) => `
         <tr>
           <td style="border:1px solid #ccc; padding:5px;">${i+1}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.tcs_no||'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_branch||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.tcs_date||'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_dest||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.close_date||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.gst_amt)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.net_liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.penalty?'₹'+fmt(t.penalty):'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.handling?'₹'+fmt(t.handling):'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.early_ded?'₹'+fmt(t.early_ded):'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.gps_ded?'₹'+fmt(t.gps_ded):'-'}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.tds_ded?'₹'+fmt(t.tds_ded):'-'}</td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr style="background:#f5f5f5; font-weight:bold;">
-          <td colspan="4" style="border:1px solid #ccc; padding:5px;">TOTAL</td>
+          <td colspan="6" style="border:1px solid #ccc; padding:5px;">TOTAL</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.gst)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.netLiability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.penalty)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.handling)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.early)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.gps)}</td>
+          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.tds)}</td>
         </tr>
       </tfoot>
     </table>`;
