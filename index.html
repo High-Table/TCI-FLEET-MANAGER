@@ -452,6 +452,7 @@ function renderTripTable(acc, names){
     trips: trips.length,
     netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
     penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
+    gst: trips.reduce((s,t)=>s+(t.gst_amt||0),0),
   };
 
   if(!selectedVehicle[acc] || !vehicleNames.includes(selectedVehicle[acc])) selectedVehicle[acc] = vehicleNames[0];
@@ -468,6 +469,7 @@ function renderTripTable(acc, names){
       <span><b>${vehicleNames.length}</b> vehicles</span>
       <span><b>${grand.trips}</b> total trips</span>
       <span>Net Liability: <b>₹${fmt(grand.netLiability)}</b></span>
+      <span>GST Amt: <b>₹${fmt(grand.gst)}</b></span>
       <span>Penalty Ded.: <b>₹${fmt(grand.penalty)}</b></span>
     </div>
     <div class="veh-tabs">${tabsHtml}</div>
