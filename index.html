@@ -611,12 +611,16 @@ function shareVehiclePdf(acc, vehicle){
       </tfoot>
     </table>`;
 
-  // Temporarily attach off-screen so we can measure its real rendered size,
-  // then size the PDF page to match exactly — this guarantees no column
-  // ever gets cropped, regardless of the phone's screen width.
-  printDiv.style.position = 'absolute';
-  printDiv.style.left = '-9999px';
+  // Temporarily attach so we can measure its real rendered size, then size
+  // the PDF page to match exactly — this guarantees no column ever gets
+  // cropped. Positioned at normal (0,0) coordinates but behind the opaque
+  // app UI (z-index -9999) rather than off-screen at an extreme negative
+  // offset — extreme offsets cause blank/empty canvas captures on some
+  // mobile browsers (notably Safari).
+  printDiv.style.position = 'fixed';
+  printDiv.style.left = '0';
   printDiv.style.top = '0';
+  printDiv.style.zIndex = '-9999';
   document.body.appendChild(printDiv);
 
   const pxToPt = 72 / 96;
@@ -627,7 +631,7 @@ function shareVehiclePdf(acc, vehicle){
     margin: 0,
     filename: `${vehicle}_trips.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, windowWidth: printDiv.scrollWidth },
+    html2canvas: { scale: 2, windowWidth: printDiv.scrollWidth, scrollX: 0, scrollY: 0 },
     jsPDF: { unit: 'pt', format: [pageWidthPt, pageHeightPt], orientation: 'landscape' }
   };
 
@@ -645,6 +649,9 @@ function shareVehiclePdf(acc, vehicle){
     a.href = url; a.download = `${vehicle}_trips.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }).catch((err) => {
+    if(printDiv.parentNode) document.body.removeChild(printDiv);
+    alert('PDF banane mein error aaya: ' + err.message);
   });
 }
 
