@@ -272,7 +272,28 @@ function formatDateForScrape(yyyyMmDd){
   return `${d}-${months[parseInt(m,10)-1]}-${y}`;
 }
 
+// PIN protects the Update Now action only — app viewing needs no PIN.
+// Stored as a SHA-256 hash, never in plain text.
+const UPDATE_PIN_HASH = 'f1250af9005fb93c6bc8ea65860a4079e4f90b38d8c258af498bf8cb5e9e84df';
+
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkUpdatePin(){
+  const pin = prompt('Update karne ke liye PIN daalo:');
+  if(pin === null) return false; // cancelled
+  const hash = await sha256Hex(pin.trim());
+  if(hash !== UPDATE_PIN_HASH){
+    alert('Galat PIN — update cancel ho gaya.');
+    return false;
+  }
+  return true;
+}
+
 async function triggerUpdate(){
+  if(!(await checkUpdatePin())) return;
   if(!confirm('Would you like to proceed?')) return;
 
   const btn = document.getElementById('updateBtn');
