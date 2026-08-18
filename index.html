@@ -615,7 +615,7 @@ function shareVehiclePdf(acc, vehicle){
     margin: 10,
     filename: `${vehicle}_trips.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
+    html2canvas: { scale: 2, windowWidth: 1400, width: 1400 },
     jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
   };
 
