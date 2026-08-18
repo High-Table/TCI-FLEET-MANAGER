@@ -611,16 +611,21 @@ function shareVehiclePdf(acc, vehicle){
       </tfoot>
     </table>`;
 
-  // Temporarily attach so we can measure its real rendered size, then size
-  // the PDF page to match exactly — this guarantees no column ever gets
-  // cropped. Positioned at normal (0,0) coordinates but behind the opaque
-  // app UI (z-index -9999) rather than off-screen at an extreme negative
-  // offset — extreme offsets cause blank/empty canvas captures on some
-  // mobile browsers (notably Safari).
+  // html2canvas needs the element to be genuinely rendered on-screen to
+  // capture it reliably — any "hide it" trick (extreme offsets, negative
+  // z-index, visibility:hidden) can produce a blank capture on mobile
+  // browsers. So we show it for real, behind a loading overlay that
+  // covers it — this also gives the user a clear "generating" message
+  // instead of a confusing flash of a raw table.
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; inset:0; background:#0f1117; z-index:99999; display:flex; align-items:center; justify-content:center; color:#e2e8f0; font-family:Segoe UI,system-ui,sans-serif; font-size:0.9rem;';
+  overlay.textContent = '📄 PDF generate ho raha hai...';
+  document.body.appendChild(overlay);
+
   printDiv.style.position = 'fixed';
   printDiv.style.left = '0';
   printDiv.style.top = '0';
-  printDiv.style.zIndex = '-9999';
+  printDiv.style.zIndex = '1';
   document.body.appendChild(printDiv);
 
   const pxToPt = 72 / 96;
@@ -635,8 +640,13 @@ function shareVehiclePdf(acc, vehicle){
     jsPDF: { unit: 'pt', format: [pageWidthPt, pageHeightPt], orientation: 'landscape' }
   };
 
+  function cleanup(){
+    if(printDiv.parentNode) document.body.removeChild(printDiv);
+    if(overlay.parentNode) document.body.removeChild(overlay);
+  }
+
   html2pdf().set(opt).from(printDiv).outputPdf('blob').then(async (blob) => {
-    document.body.removeChild(printDiv);
+    cleanup();
     const file = new File([blob], `${vehicle}_trips.pdf`, { type: 'application/pdf' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
       try{
@@ -650,7 +660,7 @@ function shareVehiclePdf(acc, vehicle){
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }).catch((err) => {
-    if(printDiv.parentNode) document.body.removeChild(printDiv);
+    cleanup();
     alert('PDF banane mein error aaya: ' + err.message);
   });
 }
