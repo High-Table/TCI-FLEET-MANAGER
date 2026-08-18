@@ -7,7 +7,8 @@
 <title>TCI Fleet Manager</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -612,11 +613,9 @@ function shareVehiclePdf(acc, vehicle){
     </table>`;
 
   // html2canvas needs the element to be genuinely rendered on-screen to
-  // capture it reliably — any "hide it" trick (extreme offsets, negative
-  // z-index, visibility:hidden) can produce a blank capture on mobile
-  // browsers. So we show it for real, behind a loading overlay that
-  // covers it — this also gives the user a clear "generating" message
-  // instead of a confusing flash of a raw table.
+  // capture it reliably — so we show it for real, behind a loading
+  // overlay that covers it (also gives the user a clean "generating"
+  // message instead of a raw table flash).
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed; inset:0; background:#0f1117; z-index:99999; display:flex; align-items:center; justify-content:center; color:#e2e8f0; font-family:Segoe UI,system-ui,sans-serif; font-size:0.9rem;';
   overlay.textContent = '📄 PDF generate ho raha hai...';
@@ -628,25 +627,32 @@ function shareVehiclePdf(acc, vehicle){
   printDiv.style.zIndex = '1';
   document.body.appendChild(printDiv);
 
-  const pxToPt = 72 / 96;
-  const pageWidthPt = printDiv.scrollWidth * pxToPt;
-  const pageHeightPt = printDiv.scrollHeight * pxToPt;
-
-  const opt = {
-    margin: 0,
-    filename: `${vehicle}_trips.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, windowWidth: printDiv.scrollWidth, scrollX: 0, scrollY: 0 },
-    jsPDF: { unit: 'pt', format: [pageWidthPt, pageHeightPt], orientation: 'landscape' }
-  };
-
   function cleanup(){
     if(printDiv.parentNode) document.body.removeChild(printDiv);
     if(overlay.parentNode) document.body.removeChild(overlay);
   }
 
-  html2pdf().set(opt).from(printDiv).outputPdf('blob').then(async (blob) => {
+  // Direct html2canvas + jsPDF (no html2pdf wrapper) — full control and
+  // errors surface explicitly instead of failing silently.
+  html2canvas(printDiv, {
+    scale: 2,
+    windowWidth: printDiv.scrollWidth,
+    scrollX: 0,
+    scrollY: 0,
+    useCORS: true
+  }).then(async (canvas) => {
+    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+    const pxToPt = 72 / 96;
+    const pageWidthPt = (canvas.width / 2) * pxToPt;   // /2 to undo the scale:2 device-pixel multiplier
+    const pageHeightPt = (canvas.height / 2) * pxToPt;
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [pageWidthPt, pageHeightPt] });
+    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthPt, pageHeightPt);
+    const blob = pdf.output('blob');
+
     cleanup();
+
     const file = new File([blob], `${vehicle}_trips.pdf`, { type: 'application/pdf' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
       try{
