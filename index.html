@@ -611,15 +611,28 @@ function shareVehiclePdf(acc, vehicle){
       </tfoot>
     </table>`;
 
+  // Temporarily attach off-screen so we can measure its real rendered size,
+  // then size the PDF page to match exactly — this guarantees no column
+  // ever gets cropped, regardless of the phone's screen width.
+  printDiv.style.position = 'absolute';
+  printDiv.style.left = '-9999px';
+  printDiv.style.top = '0';
+  document.body.appendChild(printDiv);
+
+  const pxToPt = 72 / 96;
+  const pageWidthPt = printDiv.scrollWidth * pxToPt;
+  const pageHeightPt = printDiv.scrollHeight * pxToPt;
+
   const opt = {
-    margin: 10,
+    margin: 0,
     filename: `${vehicle}_trips.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, windowWidth: 1400, width: 1400 },
-    jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+    html2canvas: { scale: 2, windowWidth: printDiv.scrollWidth },
+    jsPDF: { unit: 'pt', format: [pageWidthPt, pageHeightPt], orientation: 'landscape' }
   };
 
   html2pdf().set(opt).from(printDiv).outputPdf('blob').then(async (blob) => {
+    document.body.removeChild(printDiv);
     const file = new File([blob], `${vehicle}_trips.pdf`, { type: 'application/pdf' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
       try{
