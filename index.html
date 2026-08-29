@@ -7,8 +7,7 @@
 <title>TCI Fleet Manager</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -36,18 +35,15 @@
   .section { display:none; }
   .section.active { display:block; }
 
-  /* ── Account tabs (Manish/Suresh/etc) ── */
   .acc-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   .acc-tab { background:var(--card); border:1px solid var(--border); border-radius:8px;
     padding:7px 14px; cursor:pointer; font-size:0.8rem; font-weight:600; }
   .acc-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
 
-  /* ── Grand summary ── */
   .grand-summary { display:flex; gap:14px; flex-wrap:wrap; background:var(--card); border:1px solid var(--border);
     border-radius:12px; padding:12px 16px; margin-bottom:14px; font-size:0.78rem; color:var(--muted); }
   .grand-summary b { color:var(--text); font-size:0.88rem; }
 
-  /* ── Vehicle tabs ── */
   .veh-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
   .veh-tab { background:var(--card); border:1px solid var(--border); border-radius:8px;
     padding:7px 12px; cursor:pointer; font-size:0.78rem; font-weight:600; display:inline-flex; align-items:center; gap:6px; }
@@ -67,7 +63,6 @@
     padding:6px 9px; cursor:pointer; font-size:0.72rem; color:var(--text); display:inline-flex; align-items:center; gap:4px; }
   .icon-btn:active { background:rgba(255,255,255,0.16); }
 
-  /* Table always scrolls horizontally - same as laptop dashboard */
   .table-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .trip-table { width:100%; border-collapse:collapse; font-size:0.72rem; }
   .trip-table th { background:#171a29; padding:7px 8px; text-align:left; font-size:0.6rem;
@@ -89,7 +84,6 @@
   .add-vehicle-btn { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none;
     border-radius:8px; padding:9px 16px; font-weight:600; font-size:0.82rem; cursor:pointer; margin-bottom:14px; }
 
-  /* ── Modal form (Add/Edit vehicle) ── */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200;
     align-items:flex-start; justify-content:center; padding:40px 14px; overflow-y:auto; }
   .modal-overlay.active { display:flex; }
@@ -114,7 +108,6 @@
   .msg { font-size:0.75rem; color:var(--muted); margin-top:8px; text-align:center; }
   .empty { color:var(--muted); font-size:0.85rem; text-align:center; padding:30px 10px; }
 
-  /* ── Home page (Update Now + nav cards) ── */
   .update-btn { width:100%; background:#ec4899; color:#fff; border:none; border-radius:8px; height:48px;
     font-size:0.95rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px;
     margin-bottom:14px; cursor:pointer; }
@@ -147,7 +140,6 @@
 </header>
 
 <div class="main">
-  <!-- Login (one-time) -->
   <div id="loginBox" class="login-box card" style="display:none;">
     <div style="font-weight:700; margin-bottom:14px;">Sign in</div>
     <input type="email" id="loginEmail" placeholder="Email">
@@ -156,11 +148,28 @@
     <div class="msg" id="loginMsg"></div>
   </div>
 
-  <!-- Data view -->
   <div id="dataView" style="display:none;">
 
-    <!-- Home page -->
     <div id="homeView">
+      <button id="updateBtn" class="update-btn" onclick="triggerUpdate()">🔄 Update Now</button>
+
+      <div class="range-box">
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--muted);">
+          <input type="checkbox" id="customRange" onchange="toggleRangeFields()"> Custom date range
+        </label>
+        <div id="rangeFields" class="range-fields">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">From</span>
+            <input type="date" id="fromDate">
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.72rem; color:var(--muted); width:34px;">To</span>
+            <input type="date" id="toDate">
+          </div>
+          <div id="rangeErr" class="range-err">Dono dates bharo pehle</div>
+        </div>
+      </div>
+
       <div class="nav-grid">
         <button class="nav-card" onclick="showSection('trips')">
           <div class="nav-icon" style="background:#a16207;">
@@ -182,36 +191,15 @@
         </button>
       </div>
 
-      <button id="updateBtn" class="update-btn" onclick="triggerUpdate()" style="margin-top:14px;">🔄 Update Now</button>
-
-      <div class="range-box">
-        <label style="display:flex; align-items:center; gap:8px; font-size:0.8rem; color:var(--muted);">
-          <input type="checkbox" id="customRange" onchange="toggleRangeFields()"> Custom date range
-        </label>
-        <div id="rangeFields" class="range-fields">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:0.72rem; color:var(--muted); width:34px;">From</span>
-            <input type="date" id="fromDate">
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:0.72rem; color:var(--muted); width:34px;">To</span>
-            <input type="date" id="toDate">
-          </div>
-          <div id="rangeErr" class="range-err">Dono dates bharo pehle</div>
-        </div>
-      </div>
-
       <div class="footer-credit">Designed by Manish Chaudhari</div>
     </div>
 
-    <!-- Trip Details section -->
     <div id="section-trips" class="section">
       <div class="tab back-link" onclick="showHome()">← Back</div>
       <div class="acc-tabs" id="acc-tabs"></div>
       <div id="trip-table-wrap"></div>
     </div>
 
-    <!-- Vehicle Details section -->
     <div id="section-vehicles" class="section">
       <div class="tab back-link" onclick="showHome()">← Back</div>
       <div id="vehicles-inner"></div>
@@ -219,7 +207,6 @@
   </div>
 </div>
 
-<!-- Add/Edit Vehicle modal -->
 <div class="modal-overlay" id="vehicleModal">
   <div class="modal-box">
     <h3 id="vehicleModalTitle">Add Vehicle</h3>
@@ -243,12 +230,36 @@ let currentAcc = null;
 let selectedVehicle = {};
 let editingVehicleIndex = null;
 
+// ── Date parsing helper (used for correct chronological sorting) ──────
+// Trip dates come from the scraper as "DD-Mon-YYYY" strings (e.g. "20-Jul-2026").
+// IMPORTANT: never sort these with plain string compare (localeCompare) —
+// that sorts by the day-of-month digits first (since they're the first
+// characters in the string) and ignores the month entirely, which mixes
+// up trips across a multi-month range. Always convert to a real Date
+// first, then compare/sort using that.
+const MONTHS_MAP = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function parseTcsDate(dateStr){
+  if(!dateStr) return null;
+  const parts = dateStr.split('-');
+  if(parts.length !== 3) return null;
+  const month = MONTHS_MAP[parts[1].toLowerCase()];
+  if(month === undefined) return null;
+  const d = new Date(parseInt(parts[2],10), month, parseInt(parts[0],10));
+  return isNaN(d.getTime()) ? null : d;
+}
+function compareTcsDates(a, b){
+  const da = parseTcsDate(a), db = parseTcsDate(b);
+  if(!da && !db) return 0;
+  if(!da) return -1;
+  if(!db) return 1;
+  return da - db;
+}
+
 function setStatus(text, online){
   document.getElementById('statusText').textContent = text;
   document.getElementById('statusDot').className = 'status-dot' + (online ? '' : ' offline');
 }
 
-// ── Home page navigation ──────────────────────────────────────────────
 function showHome(){
   document.getElementById('homeView').style.display = 'block';
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -272,30 +283,7 @@ function formatDateForScrape(yyyyMmDd){
   return `${d}-${months[parseInt(m,10)-1]}-${y}`;
 }
 
-// PIN protects the Update Now action only — app viewing needs no PIN.
-// Stored as a SHA-256 hash, never in plain text.
-const UPDATE_PIN_HASH = 'f1250af9005fb93c6bc8ea65860a4079e4f90b38d8c258af498bf8cb5e9e84df';
-
-async function sha256Hex(text){
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
-async function checkUpdatePin(){
-  const pin = prompt('Update karne ke liye PIN daalo:');
-  if(pin === null) return false; // cancelled
-  const hash = await sha256Hex(pin.trim());
-  if(hash !== UPDATE_PIN_HASH){
-    alert('Galat PIN — update cancel ho gaya.');
-    return false;
-  }
-  return true;
-}
-
 async function triggerUpdate(){
-  if(!(await checkUpdatePin())) return;
-  if(!confirm('Would you like to proceed?')) return;
-
   const btn = document.getElementById('updateBtn');
   const checked = document.getElementById('customRange').checked;
   let body = {};
@@ -343,7 +331,6 @@ async function firebaseLogin(email, password){
   return res.json();
 }
 
-// Silently exchange the long-lived refresh token for a fresh idToken.
 async function refreshIdToken(){
   const refreshToken = localStorage.getItem('tci_refresh_token');
   if(!refreshToken) return null;
@@ -369,7 +356,6 @@ async function fetchData(idToken){
   return res.json();
 }
 
-// Writes the full vehicle_info array back to Firebase (doesn't touch trip_details/last_updated).
 async function writeVehicleInfo(vehicles){
   let idToken = localStorage.getItem('tci_id_token');
   async function attempt(token){
@@ -452,7 +438,6 @@ function renderTripTable(acc, names){
     trips: trips.length,
     netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
     penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
-    gst: trips.reduce((s,t)=>s+(t.gst_amt||0),0),
   };
 
   if(!selectedVehicle[acc] || !vehicleNames.includes(selectedVehicle[acc])) selectedVehicle[acc] = vehicleNames[0];
@@ -469,7 +454,6 @@ function renderTripTable(acc, names){
       <span><b>${vehicleNames.length}</b> vehicles</span>
       <span><b>${grand.trips}</b> total trips</span>
       <span>Net Liability: <b>₹${fmt(grand.netLiability)}</b></span>
-      <span>GST Amt: <b>₹${fmt(grand.gst)}</b></span>
       <span>Penalty Ded.: <b>₹${fmt(grand.penalty)}</b></span>
     </div>
     <div class="veh-tabs">${tabsHtml}</div>
@@ -498,7 +482,9 @@ function renderVehicleTripTable(acc, vehicle, byVehicle, accDisplayName){
   const area = document.getElementById('veh-table-area');
   if(!area || !byVehicle[vehicle]) return;
 
-  const vTrips = [...byVehicle[vehicle]].sort((a,b)=>(a.tcs_date||'').localeCompare(b.tcs_date||''));
+  // Sort chronologically (real dates), not alphabetically as strings —
+  // see parseTcsDate/compareTcsDates above for why.
+  const vTrips = [...byVehicle[vehicle]].sort((a,b)=>compareTcsDates(a.tcs_date, b.tcs_date));
   const vTotal = {
     liability: vTrips.reduce((s,t)=>s+(t.liability||0),0),
     gst: vTrips.reduce((s,t)=>s+(t.gst_amt||0),0),
@@ -559,11 +545,10 @@ function renderVehicleTripTable(acc, vehicle, byVehicle, accDisplayName){
   </div>`;
 }
 
-// ── Share/PDF ──────────────────────────────────────────────────────────
 function shareVehiclePdf(acc, vehicle){
   const trips = (appData?.trip_details?.[acc] || [])
     .filter(t => (t.vehicle || 'Unknown') === vehicle)
-    .sort((a,b)=>(a.tcs_date||'').localeCompare(b.tcs_date||''));
+    .sort((a,b)=>compareTcsDates(a.tcs_date, b.tcs_date));
   const { names } = accKeysAndNames(appData);
   const accName = names[acc] || acc;
 
@@ -572,110 +557,57 @@ function shareVehiclePdf(acc, vehicle){
     gst: trips.reduce((s,t)=>s+(t.gst_amt||0),0),
     netLiability: trips.reduce((s,t)=>s+(t.net_liability||0),0),
     penalty: trips.reduce((s,t)=>s+(t.penalty||0),0),
-    handling: trips.reduce((s,t)=>s+(t.handling||0),0),
-    early: trips.reduce((s,t)=>s+(t.early_ded||0),0),
-    gps: trips.reduce((s,t)=>s+(t.gps_ded||0),0),
-    tds: trips.reduce((s,t)=>s+(t.tds_ded||0),0),
   };
 
-  // Same columns as the on-screen trip table — nothing left out.
   const printDiv = document.createElement('div');
-  printDiv.style.cssText = 'background:#fff; color:#111; padding:20px; font-family:Segoe UI,system-ui,sans-serif; width:1400px;';
+  printDiv.style.cssText = 'background:#fff; color:#111; padding:20px; font-family:Segoe UI,system-ui,sans-serif; width:900px;';
   printDiv.innerHTML = `
     <h2 style="margin-bottom:4px;">TCI Fleet Manager — ${vehicle}</h2>
     <div style="color:#555; margin-bottom:14px; font-size:13px;">Account: ${accName} &nbsp;|&nbsp; Generated: ${new Date().toLocaleString('en-IN')}</div>
-    <table style="width:100%; border-collapse:collapse; font-size:10px;">
+    <table style="width:100%; border-collapse:collapse; font-size:11px;">
       <thead><tr style="background:#eee;">
-        <th style="border:1px solid #ccc; padding:5px;">Sr No.</th>
-        <th style="border:1px solid #ccc; padding:5px;">TCS No.</th>
-        <th style="border:1px solid #ccc; padding:5px;">TCS Branch</th>
+        <th style="border:1px solid #ccc; padding:5px;">Sr</th>
+        <th style="border:1px solid #ccc; padding:5px;">TCS No</th>
         <th style="border:1px solid #ccc; padding:5px;">TCS Date</th>
-        <th style="border:1px solid #ccc; padding:5px;">TCS Dest</th>
         <th style="border:1px solid #ccc; padding:5px;">Close Date</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Liability Amt</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GST Amt</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Liability</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GST</th>
         <th style="border:1px solid #ccc; padding:5px; text-align:right;">Net Liability</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Penalty Ded.</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Handling Amt</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Early Payment Ded.</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">GPS Amt Ded.</th>
-        <th style="border:1px solid #ccc; padding:5px; text-align:right;">TDS Ded.</th>
+        <th style="border:1px solid #ccc; padding:5px; text-align:right;">Penalty</th>
       </tr></thead>
       <tbody>
         ${trips.map((t,i) => `
         <tr>
           <td style="border:1px solid #ccc; padding:5px;">${i+1}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.tcs_no||'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_branch||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.tcs_date||'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px;">${t.tcs_dest||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px;">${t.close_date||'-'}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.gst_amt)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(t.net_liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.penalty?'₹'+fmt(t.penalty):'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.handling?'₹'+fmt(t.handling):'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.early_ded?'₹'+fmt(t.early_ded):'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.gps_ded?'₹'+fmt(t.gps_ded):'-'}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">${t.tds_ded?'₹'+fmt(t.tds_ded):'-'}</td>
         </tr>`).join('')}
       </tbody>
       <tfoot>
         <tr style="background:#f5f5f5; font-weight:bold;">
-          <td colspan="6" style="border:1px solid #ccc; padding:5px;">TOTAL</td>
+          <td colspan="4" style="border:1px solid #ccc; padding:5px;">TOTAL</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.liability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.gst)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.netLiability)}</td>
           <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.penalty)}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.handling)}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.early)}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.gps)}</td>
-          <td style="border:1px solid #ccc; padding:5px; text-align:right;">₹${fmt(total.tds)}</td>
         </tr>
       </tfoot>
     </table>`;
 
-  // html2canvas needs the element to be genuinely rendered on-screen to
-  // capture it reliably — so we show it for real, behind a loading
-  // overlay that covers it (also gives the user a clean "generating"
-  // message instead of a raw table flash).
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed; inset:0; background:#0f1117; z-index:99999; display:flex; align-items:center; justify-content:center; color:#e2e8f0; font-family:Segoe UI,system-ui,sans-serif; font-size:0.9rem;';
-  overlay.textContent = '📄 PDF generate ho raha hai...';
-  document.body.appendChild(overlay);
+  const opt = {
+    margin: 10,
+    filename: `${vehicle}_trips.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'pt', format: 'a4', orientation: 'landscape' }
+  };
 
-  printDiv.style.position = 'fixed';
-  printDiv.style.left = '0';
-  printDiv.style.top = '0';
-  printDiv.style.zIndex = '1';
-  document.body.appendChild(printDiv);
-
-  function cleanup(){
-    if(printDiv.parentNode) document.body.removeChild(printDiv);
-    if(overlay.parentNode) document.body.removeChild(overlay);
-  }
-
-  // Direct html2canvas + jsPDF (no html2pdf wrapper) — full control and
-  // errors surface explicitly instead of failing silently.
-  html2canvas(printDiv, {
-    scale: 2,
-    windowWidth: printDiv.scrollWidth,
-    scrollX: 0,
-    scrollY: 0,
-    useCORS: true
-  }).then(async (canvas) => {
-    const imgData = canvas.toDataURL('image/jpeg', 0.98);
-    const pxToPt = 72 / 96;
-    const pageWidthPt = (canvas.width / 2) * pxToPt;   // /2 to undo the scale:2 device-pixel multiplier
-    const pageHeightPt = (canvas.height / 2) * pxToPt;
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [pageWidthPt, pageHeightPt] });
-    pdf.addImage(imgData, 'JPEG', 0, 0, pageWidthPt, pageHeightPt);
-    const blob = pdf.output('blob');
-
-    cleanup();
-
+  html2pdf().set(opt).from(printDiv).outputPdf('blob').then(async (blob) => {
     const file = new File([blob], `${vehicle}_trips.pdf`, { type: 'application/pdf' });
     if(navigator.canShare && navigator.canShare({ files: [file] })){
       try{
@@ -688,9 +620,6 @@ function shareVehiclePdf(acc, vehicle){
     a.href = url; a.download = `${vehicle}_trips.pdf`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }).catch((err) => {
-    cleanup();
-    alert('PDF banane mein error aaya: ' + err.message);
   });
 }
 
@@ -707,28 +636,21 @@ const DATE_FIELD_KEYS = ['insurance','puc','fitness','national_permit','permit']
 
 function expiryClass(dateStr){
   if(!dateStr) return '';
-  try{
-    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const parts = dateStr.split('-');
-    if(parts.length !== 3) return '';
-    const d = new Date(parseInt(parts[2]), months[parts[1].toLowerCase()], parseInt(parts[0]));
-    const diff = Math.floor((d - new Date()) / 86400000);
-    if(diff <= 3) return 'exp-red';
-    if(diff <= 35) return 'exp-orange';
-    return 'exp-green';
-  } catch { return ''; }
+  const d = parseTcsDate(dateStr);
+  if(!d) return '';
+  const diff = Math.floor((d - new Date()) / 86400000);
+  if(diff <= 3) return 'exp-red';
+  if(diff <= 35) return 'exp-orange';
+  return 'exp-green';
 }
 
 function formatExpiry(dateStr){
   if(!dateStr || dateStr === 'NILL') return dateStr || '-';
-  try{
-    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-    const parts = dateStr.split('-');
-    const d = new Date(parseInt(parts[2]), months[parts[1].toLowerCase()], parseInt(parts[0]));
-    const diff = Math.floor((d - new Date()) / 86400000);
-    const suffix = diff < 0 ? ` (${Math.abs(diff)}d ago)` : diff === 0 ? ' (Today!)' : ` (${diff}d)`;
-    return dateStr + suffix;
-  } catch { return dateStr; }
+  const d = parseTcsDate(dateStr);
+  if(!d) return dateStr;
+  const diff = Math.floor((d - new Date()) / 86400000);
+  const suffix = diff < 0 ? ` (${Math.abs(diff)}d ago)` : diff === 0 ? ' (Today!)' : ` (${diff}d)`;
+  return dateStr + suffix;
 }
 
 function renderVehicleInfo(){
@@ -762,7 +684,6 @@ function renderVehicleInfo(){
   el.innerHTML = html;
 }
 
-// ── Add / Edit vehicle form ───────────────────────────────────────────
 function openVehicleForm(idx){
   editingVehicleIndex = (typeof idx === 'number') ? idx : null;
   const vehicles = appData?.vehicle_info || [];
