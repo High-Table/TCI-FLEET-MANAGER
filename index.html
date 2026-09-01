@@ -108,6 +108,7 @@
   .msg { font-size:0.75rem; color:var(--muted); margin-top:8px; text-align:center; }
   .empty { color:var(--muted); font-size:0.85rem; text-align:center; padding:30px 10px; }
 
+  /* ── Home page ── */
   .update-btn { width:100%; background:#ec4899; color:#fff; border:none; border-radius:8px; height:48px;
     font-size:0.95rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:8px;
     margin-bottom:14px; cursor:pointer; }
@@ -119,16 +120,21 @@
     border-radius:8px; color:var(--text); font-size:0.85rem; }
   .range-err { display:none; font-size:0.72rem; color:var(--red); }
   .range-err.show { display:block; }
-  .nav-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+  .nav-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-bottom:20px; }
   .nav-card { text-align:left; background:var(--card); border:1px solid var(--border); border-radius:14px;
     padding:16px 12px; display:flex; flex-direction:column; gap:10px; cursor:pointer; min-width:0; }
   .nav-card:active { background:#1e2133; }
   .nav-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .nav-icon svg { width:20px; height:20px; }
+  .nav-icon-wide { width:100%; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; padding:0 6px; }
+  .nav-icon-wide svg { width:100%; height:22px; }
   .nav-title { font-weight:600; font-size:0.85rem; }
   .nav-sub { font-size:0.68rem; color:var(--muted); margin-top:2px; }
-  .footer-credit { text-align:center; font-size:0.7rem; color:var(--muted); padding-top:14px;
-    border-top:1px solid var(--border); margin-top:10px; }
+  .footer-credit { text-align:center; padding-top:16px; border-top:1px solid var(--border); margin-top:10px; }
+  .footer-credit-name { font-size:0.95rem; font-weight:600; letter-spacing:0.06em; color:var(--text); text-transform:uppercase; }
+  .footer-credit-photo { width:52px; height:52px; border-radius:50%; object-fit:cover; margin:12px auto 0;
+    display:block; border:2px solid var(--border); }
   .back-link { display:inline-block; margin-bottom:14px; cursor:pointer; }
 </style>
 </head>
@@ -150,7 +156,38 @@
 
   <div id="dataView" style="display:none;">
 
+    <!-- Home page: nav cards first, then Update Now + date range, then credit -->
     <div id="homeView">
+      <div class="nav-grid">
+        <button class="nav-card" onclick="showSection('trips')">
+          <div class="nav-icon" style="background:#a16207;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fef9c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <div>
+            <div class="nav-title">Trip Details</div>
+            <div class="nav-sub">5 accounts</div>
+          </div>
+        </button>
+        <button class="nav-card" onclick="showSection('vehicles')">
+          <div class="nav-icon-wide" style="background:#ffedd5;">
+            <svg viewBox="0 0 64 28" fill="none" stroke="#ea580c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 20h6"/>
+              <path d="M8 20V9h9l6 6v5"/>
+              <rect x="23" y="6" width="24" height="14"/>
+              <path d="M47 12h6l4 4v4h-10"/>
+              <circle cx="13" cy="22" r="3"/>
+              <circle cx="32" cy="22" r="3"/>
+              <circle cx="42" cy="22" r="3"/>
+              <circle cx="54" cy="22" r="3"/>
+            </svg>
+          </div>
+          <div>
+            <div class="nav-title">Vehicle Details</div>
+            <div class="nav-sub">Docs and expiry</div>
+          </div>
+        </button>
+      </div>
+
       <button id="updateBtn" class="update-btn" onclick="triggerUpdate()">🔄 Update Now</button>
 
       <div class="range-box">
@@ -170,28 +207,10 @@
         </div>
       </div>
 
-      <div class="nav-grid">
-        <button class="nav-card" onclick="showSection('trips')">
-          <div class="nav-icon" style="background:#a16207;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fef9c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          </div>
-          <div>
-            <div class="nav-title">Trip Details</div>
-            <div class="nav-sub">5 accounts</div>
-          </div>
-        </button>
-        <button class="nav-card" onclick="showSection('vehicles')">
-          <div class="nav-icon" style="background:#ffedd5;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          </div>
-          <div>
-            <div class="nav-title">Vehicle Details</div>
-            <div class="nav-sub">Docs and expiry</div>
-          </div>
-        </button>
+      <div class="footer-credit">
+        <div class="footer-credit-name">Designed by Manish Chaudhari</div>
+        <img src="manish.jpg" alt="Manish Chaudhari" class="footer-credit-photo">
       </div>
-
-      <div class="footer-credit">Designed by Manish Chaudhari</div>
     </div>
 
     <div id="section-trips" class="section">
@@ -230,13 +249,6 @@ let currentAcc = null;
 let selectedVehicle = {};
 let editingVehicleIndex = null;
 
-// ── Date parsing helper (used for correct chronological sorting) ──────
-// Trip dates come from the scraper as "DD-Mon-YYYY" strings (e.g. "20-Jul-2026").
-// IMPORTANT: never sort these with plain string compare (localeCompare) —
-// that sorts by the day-of-month digits first (since they're the first
-// characters in the string) and ignores the month entirely, which mixes
-// up trips across a multi-month range. Always convert to a real Date
-// first, then compare/sort using that.
 const MONTHS_MAP = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 function parseTcsDate(dateStr){
   if(!dateStr) return null;
@@ -482,8 +494,6 @@ function renderVehicleTripTable(acc, vehicle, byVehicle, accDisplayName){
   const area = document.getElementById('veh-table-area');
   if(!area || !byVehicle[vehicle]) return;
 
-  // Sort chronologically (real dates), not alphabetically as strings —
-  // see parseTcsDate/compareTcsDates above for why.
   const vTrips = [...byVehicle[vehicle]].sort((a,b)=>compareTcsDates(a.tcs_date, b.tcs_date));
   const vTotal = {
     liability: vTrips.reduce((s,t)=>s+(t.liability||0),0),
